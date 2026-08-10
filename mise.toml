@@ -1,0 +1,23 @@
+[tools]
+go = "1.26"
+"aqua:golangci/golangci-lint" = "2.12"
+
+[tasks.setup]
+description = "Setup environment"
+run = "rm -rf ./.git/hooks && ln -sfF $(pwd)/.githooks $(pwd)/.git/hooks"
+
+[tasks.build]
+description = "Build packages"
+run = "go build ./..."
+
+[tasks.test]
+description = "Run tests"
+run = "go test -timeout 1m ./..."
+
+[tasks.testrace]
+description = "Run tests with race detector enabled"
+run = "go test -timeout 1m -race ./..."
+
+[tasks.lint]
+description = "Lint code"
+run = "golangci-lint run"

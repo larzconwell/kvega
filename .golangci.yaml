@@ -1,0 +1,103 @@
+version: "2"
+
+run:
+  timeout: "1m"
+
+formatters:
+  enable:
+    - "goimports"
+
+linters:
+  default: "none"
+  enable:
+    - "asasalint"
+    - "asciicheck"
+    - "bidichk"
+    - "bodyclose"
+    - "canonicalheader"
+    - "containedctx"
+    - "contextcheck"
+    - "copyloopvar"
+    - "dogsled"
+    - "durationcheck"
+    - "errcheck"
+    - "errname"
+    - "errorlint"
+    - "exhaustive"
+    - "fatcontext"
+    - "forcetypeassert"
+    - "funcorder"
+    - "gocheckcompilerdirectives"
+    - "gochecknoglobals"
+    - "gochecknoinits"
+    - "godot"
+    - "goprintffuncname"
+    - "gosec"
+    - "govet"
+    - "iface"
+    - "inamedparam"
+    - "ineffassign"
+    - "intrange"
+    - "iotamixing"
+    - "ireturn"
+    - "makezero"
+    - "mirror"
+    - "modernize"
+    - "nakedret"
+    - "nestif"
+    - "noctx"
+    - "noinlineerr"
+    - "nolintlint"
+    - "nonamedreturns"
+    - "nosprintfhostport"
+    - "paralleltest"
+    - "perfsprint"
+    - "prealloc"
+    - "predeclared"
+    - "promlinter"
+    - "protogetter"
+    - "reassign"
+    - "recvcheck"
+    - "revive"
+    - "rowserrcheck"
+    - "sloglint"
+    - "sqlclosecheck"
+    - "staticcheck"
+    - "testableexamples"
+    - "thelper"
+    - "tparallel"
+    - "unconvert"
+    - "unparam"
+    - "unused"
+    - "usestdlibvars"
+    - "whitespace"
+    - "wrapcheck"
+    - "wsl_v5"
+  settings:
+    bodyclose:
+      check-consumption: true
+    copyloopvar:
+      check-alias: true
+    exhaustive:
+      check:
+        - "switch"
+        - "map"
+      default-signifies-exhaustive: true
+    funcorder:
+      function: true
+    iface:
+      enable:
+        - "identical"
+        - "unused"
+        - "unexported"
+    nakedret:
+      max-func-lines: 0
+    paralleltest:
+      check-cleanup: true
+    sloglint:
+      static-msg: true
+      msg-style: "lowercased"
+      attr-only: true
+      args-on-sep-lines: true
+      key-naming-case: "snake"
+
