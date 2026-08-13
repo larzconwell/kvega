@@ -1,4 +1,4 @@
-KVega
+kvega
 ---
 
 ## Setup and Development
