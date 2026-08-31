@@ -8,6 +8,8 @@ import (
 var (
 	// ErrClosed is returned when a database has been closed.
 	ErrClosed = errors.New("database closed")
+	// ErrNotFound is returned when a key could not be found.
+	ErrNotFound = errors.New("key not found")
 )
 
 // A DB provides access to a database backend.
