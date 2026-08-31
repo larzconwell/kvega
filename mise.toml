@@ -1,6 +1,6 @@
 [tools]
-go = "1.26"
-"aqua:golangci/golangci-lint" = "2.12"
+go = "1.27"
+"aqua:golangci/golangci-lint" = "2.13"
 
 [tasks.setup]
 description = "Setup environment"
