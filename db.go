@@ -31,12 +31,12 @@ type DB interface {
 	// Set handles setting the key to the provided value.
 	//
 	// ErrClosed is returned if the database has been closed.
-	Set(key string, value Binary) error
+	Set(key string, value []byte) error
 	// Get returns the value that's associated with the key if one exists.
 	//
 	// ErrNotFound is returned if the key was not found.
 	// ErrClosed is returned if the database has been closed.
-	Get(key string) (Binary, error)
+	Get(key string) ([]byte, error)
 	// Delete handles deleting the provided key if one exists.
 	//
 	// ErrClosed is returned if the database has been closed.

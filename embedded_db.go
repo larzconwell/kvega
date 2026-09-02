@@ -11,10 +11,6 @@ var _ DB = (*EmbeddedDB)(nil)
 
 // EmbeddedDB is an implementation of DB that provides access to a database backed by
 // a file stored on the local disk.
-//
-// Writes are synchronized so that only a single write occurs at a time (though a read
-// may occur while a write is occurring). Reads on the other hand are concurrent via
-// a pool of read only file handles.
 type EmbeddedDB struct {
 	path   string
 	file   *os.File
@@ -70,7 +66,7 @@ func (edb *EmbeddedDB) Close() error {
 // Set handles setting the key to the provided value.
 //
 // ErrClosed is returned if the database has been closed.
-func (edb *EmbeddedDB) Set(_ string, _ Binary) error {
+func (edb *EmbeddedDB) Set(_ string, _ []byte) error {
 	if edb.closed.Load() {
 		return ErrClosed
 	}
@@ -82,7 +78,7 @@ func (edb *EmbeddedDB) Set(_ string, _ Binary) error {
 //
 // ErrNotFound is returned if the key was not found.
 // ErrClosed is returned if the database has been closed.
-func (edb *EmbeddedDB) Get(_ string) (Binary, error) {
+func (edb *EmbeddedDB) Get(_ string) ([]byte, error) {
 	if edb.closed.Load() {
 		return nil, ErrClosed
 	}

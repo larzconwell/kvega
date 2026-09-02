@@ -139,7 +139,7 @@ func TestEmbeddedDBSet(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, db.Close())
 
-		assert.ErrorIs(t, db.Set("key", Binary("value")), ErrClosed)
+		assert.ErrorIs(t, db.Set("key", []byte("value")), ErrClosed)
 	})
 }
 
