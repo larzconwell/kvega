@@ -128,9 +128,31 @@ func (edb *EmbeddedDB) Get(_ string) ([]byte, error) {
 // Delete handles deleting the provided key if one exists.
 //
 // ErrClosed is returned if the database has been closed.
-func (edb *EmbeddedDB) Delete(_ string) error {
+func (edb *EmbeddedDB) Delete(key string) error {
 	if edb.closed.Load() {
 		return ErrClosed
+	}
+
+	if key == "" {
+		return ErrEmptyKey
+	}
+
+	var row bytes.Buffer
+	row.WriteString("D,")
+	row.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
+	row.WriteString("\n")
+
+	edb.mu.Lock()
+	defer edb.mu.Unlock()
+
+	_, err := edb.file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return fmt.Errorf("failed to seek: %w", err)
+	}
+
+	_, err = edb.file.Write(row.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to write row: %w", err)
 	}
 
 	return nil

@@ -214,4 +214,51 @@ func TestEmbeddedDBDelete(t *testing.T) {
 
 		assert.ErrorIs(t, db.Delete("key"), ErrClosed)
 	})
+
+	t.Run("returns ErrEmptyKey if key is empty", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		assert.ErrorIs(t, db.Delete(""), ErrEmptyKey)
+	})
+
+	t.Run("writes a new row to the end of the file", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		_, err = db.file.Write([]byte("S,a2V5,dmFsdWU=\n"))
+		assert.NoError(t, err)
+
+		_, err = db.file.Seek(0, io.SeekStart)
+		assert.NoError(t, err)
+
+		err = db.Delete("key")
+		assert.NoError(t, err)
+
+		_, err = db.file.Seek(0, io.SeekStart)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		_, err = io.Copy(&buf, db.file)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "S,a2V5,dmFsdWU=\nD,a2V5\n", buf.String())
+	})
 }
