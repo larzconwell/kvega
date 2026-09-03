@@ -1,6 +1,7 @@
 package kvega
 
 import (
+	"bytes"
 	"io"
 	"os"
 	"path/filepath"
@@ -46,18 +47,6 @@ func TestOpenEmbeddedDB(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		// File used to confirm database appends new bytes to any existing bytes.
-		//gosec:disable G304
-		file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_SYNC, 0o600)
-		assert.NoError(t, err)
-
-		defer func() {
-			assert.NoError(t, file.Close())
-		}()
-
-		_, err = file.WriteString("1")
-		assert.NoError(t, err)
-
 		db, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
@@ -66,22 +55,8 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		}()
 
 		assert.Equal(t, path, db.path)
-
-		// Confirm that we opened in write only
-		_, err = db.file.Read(make([]byte, 1))
-		assert.Error(t, err)
-
-		_, err = db.file.WriteString("2")
-		assert.NoError(t, err)
-
-		// Seek to beginning to confirm old and new data exist.
-		_, err = file.Seek(0, io.SeekStart)
-		assert.NoError(t, err)
-
-		data := make([]byte, 2)
-		_, err = file.Read(data)
-		assert.NoError(t, err)
-		assert.Equal(t, []byte("12"), data)
+		assert.NotNil(t, db.file)
+		assert.Equal(t, path, db.file.Name())
 	})
 }
 
@@ -140,6 +115,53 @@ func TestEmbeddedDBSet(t *testing.T) {
 		assert.NoError(t, db.Close())
 
 		assert.ErrorIs(t, db.Set("key", []byte("value")), ErrClosed)
+	})
+
+	t.Run("returns ErrEmptyKey if key is empty", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		assert.ErrorIs(t, db.Set("", []byte("value")), ErrEmptyKey)
+	})
+
+	t.Run("writes a new row to the end of the file", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		_, err = db.file.Write([]byte("D,a2V5\n"))
+		assert.NoError(t, err)
+
+		_, err = db.file.Seek(0, io.SeekStart)
+		assert.NoError(t, err)
+
+		err = db.Set("key", []byte("value"))
+		assert.NoError(t, err)
+
+		_, err = db.file.Seek(0, io.SeekStart)
+		assert.NoError(t, err)
+
+		var buf bytes.Buffer
+
+		_, err = io.Copy(&buf, db.file)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "D,a2V5\nS,a2V5,dmFsdWU=\n", buf.String())
 	})
 }
 

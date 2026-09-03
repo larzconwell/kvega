@@ -1,20 +1,32 @@
 package kvega
 
 import (
+	"bytes"
+	"encoding/base64"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 )
 
 var _ DB = (*EmbeddedDB)(nil)
 
+var (
+	// ErrEmptyKey is returned when the given key is empty.
+	ErrEmptyKey = errors.New("empty key")
+)
+
 // EmbeddedDB is an implementation of DB that provides access to a database backed by
 // a file stored on the local disk.
 type EmbeddedDB struct {
 	path   string
-	file   *os.File
 	closed atomic.Bool
+
+	mu   sync.Mutex
+	file *os.File
 }
 
 // OpenEmbeddedDB opens the database located at the given path, creating it if it doesn't exist.
@@ -32,7 +44,7 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 
 	// The caller should ensure the provided path is safe to open.
 	//gosec:disable G304
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0o600)
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_SYNC, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
@@ -47,6 +59,9 @@ func (edb *EmbeddedDB) Close() error {
 	if edb.closed.Load() {
 		return ErrClosed
 	}
+
+	edb.mu.Lock()
+	defer edb.mu.Unlock()
 
 	err := edb.file.Sync()
 	if err != nil {
@@ -66,9 +81,33 @@ func (edb *EmbeddedDB) Close() error {
 // Set handles setting the key to the provided value.
 //
 // ErrClosed is returned if the database has been closed.
-func (edb *EmbeddedDB) Set(_ string, _ []byte) error {
+func (edb *EmbeddedDB) Set(key string, value []byte) error {
 	if edb.closed.Load() {
 		return ErrClosed
+	}
+
+	if key == "" {
+		return ErrEmptyKey
+	}
+
+	var row bytes.Buffer
+	row.WriteString("S,")
+	row.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
+	row.WriteString(",")
+	row.WriteString(base64.StdEncoding.EncodeToString(value))
+	row.WriteString("\n")
+
+	edb.mu.Lock()
+	defer edb.mu.Unlock()
+
+	_, err := edb.file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return fmt.Errorf("failed to seek: %w", err)
+	}
+
+	_, err = edb.file.Write(row.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to write row: %w", err)
 	}
 
 	return nil
