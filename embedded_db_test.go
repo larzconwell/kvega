@@ -10,6 +10,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func FuzzEmbeddedDB(f *testing.F) {
+	f.Add("key", []byte("value"))
+
+	f.Fuzz(func(t *testing.T, key string, value []byte) {
+		if key == "" {
+			return
+		}
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		err = db.Set(key, value)
+		assert.NoError(t, err)
+
+		retrievedValue, err := db.Get(key)
+		assert.NoError(t, err)
+
+		assert.Equal(t, value, retrievedValue)
+	})
+}
+
 func TestOpenEmbeddedDB(t *testing.T) {
 	t.Parallel()
 
