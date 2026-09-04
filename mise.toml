@@ -23,7 +23,11 @@ description = "Lint code"
 run = "golangci-lint run"
 
 [tasks.fuzz]
-description = "Fuzz code"
+description = "Fuzz test code"
 run = [
   "go test -timeout 1m -fuzztime 1m -fuzz FuzzEmbeddedDB ./..."
 ]
+
+[tasks.bench]
+description = "Benchmark code"
+run = "go test -benchmem -timeout 1m -benchtime 1500x -bench . ./..."

@@ -9,3 +9,5 @@ kvega
 1. `mise test` - Runs tests
 1. `mise testrace` - Run tests with race detector enabled
 1. `mise lint` - Lint code
+1. `mise fuzz` - Fuzz test code
+1. `mise bench` - Benchmark code

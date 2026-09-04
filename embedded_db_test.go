@@ -2,13 +2,94 @@ package kvega
 
 import (
 	"bytes"
+	crypto "crypto/rand"
 	"io"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func BenchmarkEmbeddedDBSet(b *testing.B) {
+	path := filepath.Join(b.ArtifactDir(), "db.kvega")
+
+	db, err := OpenEmbeddedDB(path)
+	assert.NoError(b, err)
+
+	defer func() {
+		assert.NoError(b, db.Close())
+	}()
+
+	var setErr error
+
+	// Using math/rand/v2 is good enough for this.
+	//gosec:disable G404
+	rand := rand.New(rand.NewPCG(0, 0))
+	count := -1
+
+	for b.Loop() {
+		b.StopTimer()
+		assert.NoError(b, setErr)
+
+		count++
+
+		key := strconv.Itoa(count)
+		value := make([]byte, rand.IntN(10_000))
+
+		_, err := crypto.Read(value)
+		assert.NoError(b, err)
+		b.StartTimer()
+
+		setErr = db.Set(key, value)
+	}
+
+	assert.NoError(b, setErr)
+}
+
+func BenchmarkEmbeddedDBGet(b *testing.B) {
+	path := filepath.Join(b.ArtifactDir(), "db.kvega")
+
+	db, err := OpenEmbeddedDB(path)
+	assert.NoError(b, err)
+
+	defer func() {
+		assert.NoError(b, db.Close())
+	}()
+
+	var getErr error
+
+	// Using math/rand/v2 is good enough for this.
+	//gosec:disable G404
+	rand := rand.New(rand.NewPCG(0, 0))
+	keys := 10_000
+
+	for i := range keys {
+		key := strconv.Itoa(i)
+		value := make([]byte, rand.IntN(10_000))
+
+		_, err := crypto.Read(value)
+		assert.NoError(b, err)
+		b.StartTimer()
+
+		assert.NoError(b, db.Set(key, value))
+	}
+
+	for b.Loop() {
+		b.StopTimer()
+		assert.NoError(b, getErr)
+
+		key := strconv.Itoa(rand.IntN(keys))
+
+		b.StartTimer()
+
+		_, getErr = db.Get(key)
+	}
+
+	assert.NoError(b, getErr)
+}
 
 func FuzzEmbeddedDB(f *testing.F) {
 	f.Add("key", []byte("value"))
