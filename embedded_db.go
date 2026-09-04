@@ -1,6 +1,7 @@
 package kvega
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"errors"
@@ -17,7 +18,29 @@ var _ DB = (*EmbeddedDB)(nil)
 var (
 	// ErrEmptyKey is returned when the given key is empty.
 	ErrEmptyKey = errors.New("empty key")
+	// ErrInvalidRowType is returned when row data has an invalid type.
+	ErrInvalidRowType = errors.New("invalid row type")
+	// ErrInvalidRowColumns is returned when row data contains an invalid number of columns.
+	ErrInvalidRowColumns = errors.New("invalid row columns")
+	// ErrInvalidRowColumn is returned when row data contains invalid column data.
+	ErrInvalidRowColumn = errors.New("invalid row column")
 )
+
+// InvalidRowError represents invalid database row data and the cause for the invalid data.
+type InvalidRowError struct {
+	row   int
+	cause error
+}
+
+// Error implements error interface.
+func (ire *InvalidRowError) Error() string {
+	return fmt.Sprintf("invalid row data on row %d: %s", ire.row, ire.cause.Error())
+}
+
+// Unwrap implements error unwrapping for errors.Is/errors.As.
+func (ire *InvalidRowError) Unwrap() error {
+	return ire.cause
+}
 
 // EmbeddedDB is an implementation of DB that provides access to a database backed by
 // a file stored on the local disk.
@@ -117,12 +140,104 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 //
 // ErrNotFound is returned if the key was not found.
 // ErrClosed is returned if the database has been closed.
-func (edb *EmbeddedDB) Get(_ string) ([]byte, error) {
+func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	if edb.closed.Load() {
 		return nil, ErrClosed
 	}
 
-	return nil, ErrNotFound
+	if key == "" {
+		return nil, ErrEmptyKey
+	}
+
+	_, err := edb.file.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, fmt.Errorf("failed to seek: %w", err)
+	}
+
+	var (
+		count int
+		value []byte
+	)
+
+	reader := bufio.NewReader(edb.file)
+
+	for {
+		count++
+
+		row, err := reader.ReadBytes('\n')
+		if errors.Is(err, io.EOF) {
+			if len(row) == 0 {
+				break
+			}
+
+			return nil, io.ErrUnexpectedEOF
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to read row: %w", err)
+		}
+
+		row = row[:len(row)-1] // Strip off ending \n
+
+		columns := bytes.Split(row, []byte{','})
+		switch string(columns[0]) {
+		case "S":
+			if len(columns) != 3 {
+				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
+			}
+
+			encodedKey := columns[1]
+			encodedValue := columns[2]
+
+			if len(encodedKey) == 0 {
+				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+			}
+
+			decodedKey := make([]byte, base64.StdEncoding.DecodedLen(len(encodedKey)))
+
+			length, err := base64.StdEncoding.Decode(decodedKey, encodedKey)
+			if err != nil {
+				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+			}
+
+			if string(decodedKey[:length]) == key {
+				decodedValue := make([]byte, base64.StdEncoding.DecodedLen(len(encodedValue)))
+
+				length, err := base64.StdEncoding.Decode(decodedValue, encodedValue)
+				if err != nil {
+					return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+				}
+
+				value = decodedValue[:length]
+			}
+		case "D":
+			if len(columns) != 2 {
+				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
+			}
+
+			encodedKey := columns[1]
+			if len(encodedKey) == 0 {
+				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+			}
+
+			decodedKey := make([]byte, base64.StdEncoding.DecodedLen(len(encodedKey)))
+
+			length, err := base64.StdEncoding.Decode(decodedKey, encodedKey)
+			if err != nil {
+				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+			}
+
+			if string(decodedKey[:length]) == key {
+				value = nil
+			}
+		default:
+			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowType}
+		}
+	}
+
+	if value == nil {
+		return nil, ErrNotFound
+	}
+
+	return value, nil
 }
 
 // Delete handles deleting the provided key if one exists.

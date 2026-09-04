@@ -182,6 +182,23 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.ErrorIs(t, err, ErrClosed)
 	})
 
+	t.Run("returns ErrEmptyKey if key is empty", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		value, err := db.Get("")
+		assert.Nil(t, value)
+		assert.ErrorIs(t, err, ErrEmptyKey)
+	})
+
 	t.Run("returns ErrNotFound if key does not exist", func(t *testing.T) {
 		t.Parallel()
 
@@ -197,6 +214,326 @@ func TestEmbeddedDBGet(t *testing.T) {
 		value, err := db.Get("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("returns io.ErrUnexpectedEOF if reading a line without a newline", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		// Force error by omitting the final newline.
+		_, err = db.file.Write([]byte("D,a2V5"))
+		assert.NoError(t, err)
+
+		value, err := db.Get("key")
+		assert.Nil(t, value)
+		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	})
+
+	t.Run("returns InvalidRowError(ErrInvalidRowType) if encountering a row with an invalid row type", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		db, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+
+		// Force error by using an invalid first column.
+		_, err = db.file.Write([]byte("X,a2V5\n"))
+		assert.NoError(t, err)
+
+		value, err := db.Get("key")
+		assert.Nil(t, value)
+
+		var ire *InvalidRowError
+		assert.ErrorAs(t, err, &ire)
+		assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowType)
+	})
+
+	t.Run("reading set data", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumns) if encountering a row with invalid number of columns", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by omitting the , and subsequent value.
+			_, err = db.file.Write([]byte("S,a2V5\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumns)
+		})
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with an empty key column", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by omitting the key column.
+			_, err = db.file.Write([]byte("S,,dmFsdWU=\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+		})
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a key that's not encoded as expected", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by using invalid base64 in key column.
+			_, err = db.file.Write([]byte("S,****,dmFsdWU=\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+		})
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a value that's not encoded as expected", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by using invalid base64 in value column.
+			_, err = db.file.Write([]byte("S,a2V5,****\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+		})
+
+		t.Run("returns the value stored in the row for the key", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			_, err = db.file.Write([]byte("S,a2V5,dmFsdWU=\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.NoError(t, err)
+			assert.Equal(t, []byte("value"), value)
+		})
+	})
+
+	t.Run("reading delete data", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumns) if encountering a row with invalid number of columns", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by omitting the , and subsequent key.
+			_, err = db.file.Write([]byte("D\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumns)
+		})
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with an empty key column", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by omitting the , and subsequent key.
+			_, err = db.file.Write([]byte("D,\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+		})
+
+		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a key that's not encoded as expected", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			// Force error by omitting the , and subsequent key.
+			_, err = db.file.Write([]byte("D,****\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+
+			var ire *InvalidRowError
+			assert.ErrorAs(t, err, &ire)
+			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+		})
+
+		t.Run("returns ErrNotFound when a delete row is found for the key", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			_, err = db.file.Write([]byte("D,a2V5\n"))
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+			assert.ErrorIs(t, err, ErrNotFound)
+		})
+	})
+
+	t.Run("reading mixed data", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("returns the result of the last row found for the key assuming the last row was a set", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			contents := bytes.Join([][]byte{
+				[]byte("S,a2V5,dmFsdWU=\n"),
+				[]byte("S,a2V5Mg==,dmFsdWU=\n"),
+				[]byte("D,a2V5\n"),
+				[]byte("S,a2V5,dmFsdWUy\n"),
+			}, nil)
+
+			_, err = db.file.Write(contents)
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.NoError(t, err)
+			assert.Equal(t, []byte("value2"), value)
+		})
+
+		t.Run("returns the result of the last row found for the key assuming the last row was a delete", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			contents := bytes.Join([][]byte{
+				[]byte("S,a2V5,dmFsdWU=\n"),
+				[]byte("S,a2V5Mg==,dmFsdWU=\n"),
+				[]byte("D,a2V5Mg==\n"),
+				[]byte("S,a2V5,dmFsdWUy\n"),
+				[]byte("D,a2V5\n"),
+			}, nil)
+
+			_, err = db.file.Write(contents)
+			assert.NoError(t, err)
+
+			value, err := db.Get("key")
+			assert.Nil(t, value)
+			assert.ErrorIs(t, err, ErrNotFound)
+		})
 	})
 }
 
