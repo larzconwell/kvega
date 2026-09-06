@@ -149,6 +149,9 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		return nil, ErrEmptyKey
 	}
 
+	edb.mu.Lock()
+	defer edb.mu.Unlock()
+
 	_, err := edb.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seek: %w", err)

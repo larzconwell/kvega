@@ -18,10 +18,6 @@ run = "go test -timeout 1m ./..."
 description = "Run tests with race detector enabled"
 run = "go test -timeout 1m -race ./..."
 
-[tasks.lint]
-description = "Lint code"
-run = "golangci-lint run"
-
 [tasks.fuzz]
 description = "Fuzz test code"
 run = [
@@ -30,4 +26,8 @@ run = [
 
 [tasks.bench]
 description = "Benchmark code"
-run = "go test -benchmem -timeout 1m -benchtime 1500x -bench . ./..."
+run = "go test -skip '(Test|Fuzz).*' -timeout 1m -benchmem -benchtime 1500x -bench . ./..."
+
+[tasks.lint]
+description = "Lint code"
+run = "golangci-lint run"

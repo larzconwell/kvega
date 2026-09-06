@@ -8,22 +8,27 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+type command struct {
+	typ string
+	key string
+}
 
 func BenchmarkEmbeddedDBSet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
 	db, err := OpenEmbeddedDB(path)
-	assert.NoError(b, err)
+	require.NoError(b, err)
 
 	defer func() {
-		assert.NoError(b, db.Close())
+		require.NoError(b, db.Close())
 	}()
-
-	var setErr error
 
 	// Using math/rand/v2 is good enough for this.
 	//gosec:disable G404
@@ -32,7 +37,6 @@ func BenchmarkEmbeddedDBSet(b *testing.B) {
 
 	for b.Loop() {
 		b.StopTimer()
-		assert.NoError(b, setErr)
 
 		count++
 
@@ -40,26 +44,23 @@ func BenchmarkEmbeddedDBSet(b *testing.B) {
 		value := make([]byte, rand.IntN(10_000))
 
 		_, err := crypto.Read(value)
-		assert.NoError(b, err)
+		require.NoError(b, err)
 		b.StartTimer()
 
-		setErr = db.Set(key, value)
+		err = db.Set(key, value)
+		require.NoError(b, err)
 	}
-
-	assert.NoError(b, setErr)
 }
 
 func BenchmarkEmbeddedDBGet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
 	db, err := OpenEmbeddedDB(path)
-	assert.NoError(b, err)
+	require.NoError(b, err)
 
 	defer func() {
-		assert.NoError(b, db.Close())
+		require.NoError(b, db.Close())
 	}()
-
-	var getErr error
 
 	// Using math/rand/v2 is good enough for this.
 	//gosec:disable G404
@@ -71,24 +72,58 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 		value := make([]byte, rand.IntN(10_000))
 
 		_, err := crypto.Read(value)
-		assert.NoError(b, err)
+		require.NoError(b, err)
 		b.StartTimer()
 
-		assert.NoError(b, db.Set(key, value))
+		require.NoError(b, db.Set(key, value))
 	}
 
 	for b.Loop() {
 		b.StopTimer()
-		assert.NoError(b, getErr)
 
 		key := strconv.Itoa(rand.IntN(keys))
 
 		b.StartTimer()
 
-		_, getErr = db.Get(key)
+		_, err := db.Get(key)
+		require.NoError(b, err)
+	}
+}
+
+func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
+	path := filepath.Join(b.ArtifactDir(), "db.kvega")
+
+	db, err := OpenEmbeddedDB(path)
+	require.NoError(b, err)
+
+	defer func() {
+		require.NoError(b, db.Close())
+	}()
+
+	// Using math/rand/v2 is good enough for this.
+	//gosec:disable G404
+	rand := rand.New(rand.NewPCG(0, 0))
+	keys := 10_000
+
+	for i := range keys {
+		key := strconv.Itoa(i)
+		value := make([]byte, rand.IntN(10_000))
+
+		_, err := crypto.Read(value)
+		require.NoError(b, err)
+		b.StartTimer()
+
+		require.NoError(b, db.Set(key, value))
 	}
 
-	assert.NoError(b, getErr)
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			key := strconv.Itoa(rand.IntN(keys))
+
+			_, err := db.Get(key)
+			require.NoError(b, err)
+		}
+	})
 }
 
 func FuzzEmbeddedDB(f *testing.F) {
@@ -116,6 +151,69 @@ func FuzzEmbeddedDB(f *testing.F) {
 
 		assert.Equal(t, value, retrievedValue)
 	})
+}
+
+func TestParallelEmbeddedDB(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+	db, err := OpenEmbeddedDB(path)
+	assert.NoError(t, err)
+
+	t.Cleanup(func() {
+		assert.NoError(t, db.Close())
+	})
+
+	workers := 4
+	jobs := make(chan command, workers)
+	sets := make(chan string, workers)
+	kv := map[string][]byte{
+		"one":   []byte("first"),
+		"two":   []byte("second"),
+		"three": []byte("third"),
+		"four":  []byte("fourth"),
+	}
+	commands := []command{
+		{typ: "set", key: "one"},
+		{typ: "set", key: "two"},
+		{typ: "set", key: "three"},
+		{typ: "get"},
+		{typ: "get"},
+		{typ: "set", key: "four"},
+		{typ: "get"},
+		{typ: "get"},
+	}
+
+	var wg sync.WaitGroup
+
+	for range workers {
+		wg.Go(func() {
+			for command := range jobs {
+				switch command.typ {
+				case "set":
+					err := db.Set(command.key, kv[command.key])
+					assert.NoError(t, err)
+
+					sets <- command.key
+				case "get":
+					key := <-sets
+
+					value, err := db.Get(key)
+					assert.NoError(t, err)
+					assert.Equal(t, kv[key], value)
+				}
+			}
+		})
+	}
+
+	for _, command := range commands {
+		jobs <- command
+	}
+
+	close(jobs)
+
+	wg.Wait()
 }
 
 func TestOpenEmbeddedDB(t *testing.T) {
