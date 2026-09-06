@@ -4,4 +4,10 @@ go 1.27.0
 
 require github.com/stretchr/testify v1.12.1
 
-require go.yaml.in/yaml/v3 v3.0.5 // indirect
+require (
+	github.com/aclements/go-moremath v0.0.0-20210112150236-f10218a38794 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
+	golang.org/x/perf v0.0.0-20260825160852-19be9d8e6c70 // indirect
+)
+
+tool golang.org/x/perf/cmd/benchstat

@@ -28,6 +28,10 @@ run = [
 description = "Benchmark code"
 run = "go test -skip '(Test|Fuzz).*' -timeout 1m -benchmem -benchtime 1500x -bench . ./..."
 
+[tasks.benchstat]
+description = "Compute statitics for benchmark results"
+run = "go tool benchstat"
+
 [tasks.lint]
 description = "Lint code"
 run = "golangci-lint run"
