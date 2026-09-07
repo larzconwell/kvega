@@ -1,9 +1,8 @@
 package kvega
 
 import (
-	"bufio"
-	"bytes"
 	"encoding/base64"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
@@ -171,26 +170,22 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		value []byte
 	)
 
-	reader := bufio.NewReader(edb.file)
+	reader := csv.NewReader(edb.file)
+	reader.Comma = ','
+	reader.FieldsPerRecord = -1
+	reader.ReuseRecord = true
 
 	for {
-		count++
-
-		row, err := reader.ReadBytes('\n')
+		columns, err := reader.Read()
 		if errors.Is(err, io.EOF) {
-			if len(row) == 0 {
-				break
-			}
+			break
+		}
 
-			return nil, io.ErrUnexpectedEOF
-		} else if err != nil {
+		if err != nil {
 			return nil, fmt.Errorf("failed to read row: %w", err)
 		}
 
-		row = row[:len(row)-1] // Strip off ending \n
-
-		columns := bytes.Split(row, []byte{','})
-		switch string(columns[0]) {
+		switch columns[0] {
 		case string(setType):
 			if len(columns) != 3 {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
@@ -203,22 +198,18 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
 			}
 
-			decodedKey := make([]byte, base64.StdEncoding.DecodedLen(len(encodedKey)))
-
-			length, err := base64.StdEncoding.Decode(decodedKey, encodedKey)
+			decodedKey, err := base64.StdEncoding.DecodeString(encodedKey)
 			if err != nil {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
 			}
 
-			if string(decodedKey[:length]) == key {
-				decodedValue := make([]byte, base64.StdEncoding.DecodedLen(len(encodedValue)))
-
-				length, err := base64.StdEncoding.Decode(decodedValue, encodedValue)
+			if string(decodedKey) == key {
+				decodedValue, err := base64.StdEncoding.DecodeString(encodedValue)
 				if err != nil {
 					return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
 				}
 
-				value = decodedValue[:length]
+				value = decodedValue
 			}
 		case string(deleteType):
 			if len(columns) != 2 {
@@ -230,14 +221,12 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
 			}
 
-			decodedKey := make([]byte, base64.StdEncoding.DecodedLen(len(encodedKey)))
-
-			length, err := base64.StdEncoding.Decode(decodedKey, encodedKey)
+			decodedKey, err := base64.StdEncoding.DecodeString(encodedKey)
 			if err != nil {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
 			}
 
-			if string(decodedKey[:length]) == key {
+			if string(decodedKey) == key {
 				value = nil
 			}
 		default:

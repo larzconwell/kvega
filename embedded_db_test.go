@@ -3,6 +3,7 @@ package kvega
 import (
 	"bytes"
 	crypto "crypto/rand"
+	"encoding/base64"
 	"io"
 	"math/rand/v2"
 	"os"
@@ -422,27 +423,6 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
 
-	t.Run("returns io.ErrUnexpectedEOF if reading a line without a newline", func(t *testing.T) {
-		t.Parallel()
-
-		path := filepath.Join(t.ArtifactDir(), "db.kvega")
-
-		db, err := OpenEmbeddedDB(path)
-		assert.NoError(t, err)
-
-		defer func() {
-			assert.NoError(t, db.Close())
-		}()
-
-		// Force error by omitting the final newline.
-		_, err = db.file.Write([]byte("D,a2V5"))
-		assert.NoError(t, err)
-
-		value, err := db.Get("key")
-		assert.Nil(t, value)
-		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	})
-
 	t.Run("returns InvalidRowError(ErrInvalidRowType) if encountering a row with an invalid row type", func(t *testing.T) {
 		t.Parallel()
 
@@ -584,6 +564,43 @@ func TestEmbeddedDBGet(t *testing.T) {
 			value, err := db.Get("key")
 			assert.NoError(t, err)
 			assert.Equal(t, []byte("value"), value)
+		})
+
+		t.Run("returns the value stored in the row for the key regardless of the size of the value", func(t *testing.T) {
+			t.Parallel()
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			db, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, db.Close())
+			}()
+
+			var b byte
+
+			value := make([]byte, 300*1024)
+			for idx := range value {
+				value[idx] = b
+				b++
+			}
+
+			encodedValue := make([]byte, base64.StdEncoding.EncodedLen(len(value)))
+			base64.StdEncoding.Encode(encodedValue, value)
+
+			var buf bytes.Buffer
+			buf.WriteString("S,")
+			buf.WriteString("a2V5,")
+			buf.Write(encodedValue)
+			buf.WriteByte('\n')
+
+			_, err = db.file.Write(buf.Bytes())
+			assert.NoError(t, err)
+
+			actualValue, err := db.Get("key")
+			assert.NoError(t, err)
+			assert.Equal(t, value, actualValue)
 		})
 	})
 
