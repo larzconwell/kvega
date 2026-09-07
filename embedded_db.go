@@ -16,8 +16,8 @@ import (
 var _ DB = (*EmbeddedDB)(nil)
 
 const (
-	setType    = "S"
-	deleteType = "D"
+	setType    = 'S'
+	deleteType = 'D'
 )
 
 var (
@@ -118,13 +118,16 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 		return ErrEmptyKey
 	}
 
-	var row bytes.Buffer
-	row.WriteString(setType)
-	row.WriteString(",")
-	row.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
-	row.WriteString(",")
-	row.WriteString(base64.StdEncoding.EncodeToString(value))
-	row.WriteString("\n")
+	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
+	encodedValueLen := base64.StdEncoding.EncodedLen(len(value))
+	row := make([]byte, 4+encodedKeyLen+encodedValueLen)
+
+	row[0] = setType
+	row[1] = ','
+	base64.StdEncoding.Encode(row[2:], []byte(key))
+	row[2+encodedKeyLen] = ','
+	base64.StdEncoding.Encode(row[3+encodedKeyLen:], value)
+	row[3+encodedKeyLen+encodedValueLen] = '\n'
 
 	edb.mu.Lock()
 	defer edb.mu.Unlock()
@@ -134,7 +137,7 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 		return fmt.Errorf("failed to seek: %w", err)
 	}
 
-	_, err = edb.file.Write(row.Bytes())
+	_, err = edb.file.Write(row)
 	if err != nil {
 		return fmt.Errorf("failed to write row: %w", err)
 	}
@@ -188,7 +191,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 		columns := bytes.Split(row, []byte{','})
 		switch string(columns[0]) {
-		case setType:
+		case string(setType):
 			if len(columns) != 3 {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
 			}
@@ -217,7 +220,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 				value = decodedValue[:length]
 			}
-		case deleteType:
+		case string(deleteType):
 			if len(columns) != 2 {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
 			}
@@ -261,11 +264,13 @@ func (edb *EmbeddedDB) Delete(key string) error {
 		return ErrEmptyKey
 	}
 
-	var row bytes.Buffer
-	row.WriteString(deleteType)
-	row.WriteString(",")
-	row.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
-	row.WriteString("\n")
+	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
+	row := make([]byte, 3+encodedKeyLen)
+
+	row[0] = deleteType
+	row[1] = ','
+	base64.StdEncoding.Encode(row[2:], []byte(key))
+	row[2+encodedKeyLen] = '\n'
 
 	edb.mu.Lock()
 	defer edb.mu.Unlock()
@@ -275,7 +280,7 @@ func (edb *EmbeddedDB) Delete(key string) error {
 		return fmt.Errorf("failed to seek: %w", err)
 	}
 
-	_, err = edb.file.Write(row.Bytes())
+	_, err = edb.file.Write(row)
 	if err != nil {
 		return fmt.Errorf("failed to write row: %w", err)
 	}
