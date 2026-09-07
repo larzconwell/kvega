@@ -50,6 +50,7 @@ func (ire *InvalidRowError) Unwrap() error {
 // a file stored on the local disk.
 type EmbeddedDB struct {
 	path   string
+	index  map[string]int64
 	closed atomic.Bool
 
 	mu   sync.Mutex
@@ -76,7 +77,17 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
 
-	return &EmbeddedDB{path: path, file: file}, nil
+	index, err := buildIndex(file)
+	if err != nil {
+		// The index building error is more important to surface.
+		//nolint:errcheck
+		//gosec:disable G104
+		file.Close()
+
+		return nil, err
+	}
+
+	return &EmbeddedDB{path: path, index: index, file: file}, nil
 }
 
 // Close handles flushing caches and releasing resources related to the EmbeddedDB.
@@ -277,4 +288,50 @@ func (edb *EmbeddedDB) Delete(key string) error {
 	}
 
 	return nil
+}
+
+// buildIndex builds an index of keys to their respective offset in the file,
+// it locates the last instance of any keys found in the file. The file is
+// expected to be set to the beginning of the file, i.e. no seek occurs.
+// buildIndex only does minimal validation to get valid keys from the file.
+func buildIndex(file *os.File) (map[string]int64, error) {
+	var (
+		count  int
+		offset int64
+	)
+
+	index := make(map[string]int64)
+
+	reader := csv.NewReader(file)
+	reader.Comma = ','
+	reader.FieldsPerRecord = -1
+	reader.ReuseRecord = true
+
+	for {
+		count++
+
+		columns, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to read row: %w", err)
+		}
+
+		// All row type have at least 2 columns, the row type, and a key.
+		if len(columns) < 2 {
+			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
+		}
+
+		decodedKey, err := base64.StdEncoding.DecodeString(columns[1])
+		if err != nil {
+			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+		}
+
+		index[string(decodedKey)] = offset
+		offset = reader.InputOffset()
+	}
+
+	return index, nil
 }

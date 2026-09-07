@@ -21,6 +21,46 @@ type command struct {
 	key string
 }
 
+func BenchmarkEmbeddedDBBuildIndex(b *testing.B) {
+	path := filepath.Join(b.ArtifactDir(), "db.kvega")
+
+	// Path should be fine since it's the benchmark artifact path.
+	//gosec:disable G304
+	file, err := os.Create(path)
+	require.NoError(b, err)
+
+	defer func() {
+		require.NoError(b, file.Close())
+	}()
+
+	// Using math/rand/v2 is good enough for this.
+	//gosec:disable G404
+	rand := rand.New(rand.NewPCG(0, 0))
+
+	for range 100_000 {
+		key := strconv.Itoa(rand.IntN(70_000))
+
+		var buf bytes.Buffer
+		buf.WriteString("D,")
+		buf.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
+		buf.WriteByte('\n')
+
+		_, err := file.Write(buf.Bytes())
+		require.NoError(b, err)
+	}
+
+	require.NoError(b, file.Sync())
+
+	for b.Loop() {
+		edb, err := OpenEmbeddedDB(path)
+
+		b.StopTimer()
+		require.NoError(b, err)
+		require.NoError(b, edb.Close())
+		b.StartTimer()
+	}
+}
+
 func BenchmarkEmbeddedDBSet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
@@ -249,6 +289,41 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("builds an index of keys to file offsets", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		// Path should be fine since it's the test artifact path.
+		//gosec:disable G304
+		file, err := os.Create(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, file.Close())
+		}()
+
+		contents := bytes.Join([][]byte{
+			[]byte("S,a2V5,dmFsdWU=\n"),
+			[]byte("S,a2V5Mg==,dmFsdWU=\n"),
+			[]byte("D,a2V5\n"),
+			[]byte("S,a2V5,dmFsdWUy\n"),
+		}, nil)
+
+		_, err = file.Write(contents)
+		assert.NoError(t, err)
+		assert.NoError(t, file.Sync())
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+		assert.NoError(t, edb.Close())
+
+		assert.Equal(t, map[string]int64{
+			"key":  43,
+			"key2": 16,
+		}, edb.index)
+	})
+
 	t.Run("returns embedded db", func(t *testing.T) {
 		t.Parallel()
 
@@ -262,8 +337,9 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		}()
 
 		assert.Equal(t, path, edb.path)
-		assert.NotNil(t, edb.file)
 		assert.Equal(t, path, edb.file.Name())
+		assert.NotNil(t, edb.index)
+		assert.NotNil(t, edb.file)
 	})
 }
 
