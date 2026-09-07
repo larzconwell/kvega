@@ -166,6 +166,44 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 	})
 }
 
+func BenchmarkEmbeddedDBGetErrNotFound(b *testing.B) {
+	path := filepath.Join(b.ArtifactDir(), "db.kvega")
+
+	edb, err := OpenEmbeddedDB(path)
+	require.NoError(b, err)
+
+	// Using math/rand/v2 is good enough for this.
+	//gosec:disable G404
+	rand := rand.New(rand.NewPCG(0, 0))
+	keys := 5_000
+
+	for i := range keys {
+		key := strconv.Itoa(i)
+		value := make([]byte, rand.IntN(5_000))
+
+		_, err := crypto.Read(value)
+		require.NoError(b, err)
+		b.StartTimer()
+
+		require.NoError(b, edb.Set(key, value))
+	}
+
+	require.NoError(b, edb.Close())
+
+	// Reopen embedded db to ensure index, etc. is set.
+	edb, err = OpenEmbeddedDB(path)
+	require.NoError(b, err)
+
+	defer func() {
+		require.NoError(b, edb.Close())
+	}()
+
+	for b.Loop() {
+		_, err := edb.Get("not_found")
+		require.ErrorIs(b, err, ErrNotFound)
+	}
+}
+
 func FuzzEmbeddedDB(f *testing.F) {
 	f.Add("key", []byte("value"))
 
