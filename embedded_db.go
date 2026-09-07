@@ -50,11 +50,11 @@ func (ire *InvalidRowError) Unwrap() error {
 // a file stored on the local disk.
 type EmbeddedDB struct {
 	path   string
-	index  map[string]int64
 	closed atomic.Bool
 
-	mu   sync.Mutex
-	file *os.File
+	mu    sync.Mutex
+	index map[string]int64
+	file  *os.File
 }
 
 // OpenEmbeddedDB opens the database located at the given path, creating it if it doesn't exist.
@@ -171,7 +171,9 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	edb.mu.Lock()
 	defer edb.mu.Unlock()
 
-	_, err := edb.file.Seek(0, io.SeekStart)
+	offset, foundIndex := edb.index[key]
+
+	_, err := edb.file.Seek(offset, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seek: %w", err)
 	}
@@ -244,6 +246,11 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 			}
 		default:
 			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowType}
+		}
+
+		// If we found the key in the index we only need to read a single row.
+		if foundIndex {
+			break
 		}
 	}
 
