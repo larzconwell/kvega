@@ -26,7 +26,7 @@ run = [
 
 [tasks.bench]
 description = "Benchmark code"
-run = "go test -skip '(Test|Fuzz).*' -timeout 1m -benchmem -benchtime 1500x -bench . ./..."
+run = "go test -skip '(Test|Fuzz).*' -count 6 -benchmem -bench . ./..."
 
 [tasks.benchstat]
 description = "Compute statitics for benchmark results"
