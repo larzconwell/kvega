@@ -176,6 +176,8 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	reader.ReuseRecord = true
 
 	for {
+		count++
+
 		columns, err := reader.Read()
 		if errors.Is(err, io.EOF) {
 			break
