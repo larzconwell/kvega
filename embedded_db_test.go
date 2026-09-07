@@ -24,11 +24,11 @@ type command struct {
 func BenchmarkEmbeddedDBSet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
-	db, err := OpenEmbeddedDB(path)
+	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
 	defer func() {
-		require.NoError(b, db.Close())
+		require.NoError(b, edb.Close())
 	}()
 
 	// Using math/rand/v2 is good enough for this.
@@ -48,7 +48,7 @@ func BenchmarkEmbeddedDBSet(b *testing.B) {
 		require.NoError(b, err)
 		b.StartTimer()
 
-		err = db.Set(key, value)
+		err = edb.Set(key, value)
 		require.NoError(b, err)
 	}
 }
@@ -56,11 +56,11 @@ func BenchmarkEmbeddedDBSet(b *testing.B) {
 func BenchmarkEmbeddedDBGet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
-	db, err := OpenEmbeddedDB(path)
+	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
 	defer func() {
-		require.NoError(b, db.Close())
+		require.NoError(b, edb.Close())
 	}()
 
 	// Using math/rand/v2 is good enough for this.
@@ -76,7 +76,7 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, err)
 		b.StartTimer()
 
-		require.NoError(b, db.Set(key, value))
+		require.NoError(b, edb.Set(key, value))
 	}
 
 	for b.Loop() {
@@ -86,7 +86,7 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 
 		b.StartTimer()
 
-		_, err := db.Get(key)
+		_, err := edb.Get(key)
 		require.NoError(b, err)
 	}
 }
@@ -94,11 +94,11 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
-	db, err := OpenEmbeddedDB(path)
+	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
 	defer func() {
-		require.NoError(b, db.Close())
+		require.NoError(b, edb.Close())
 	}()
 
 	// Using math/rand/v2 is good enough for this.
@@ -114,14 +114,14 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, err)
 		b.StartTimer()
 
-		require.NoError(b, db.Set(key, value))
+		require.NoError(b, edb.Set(key, value))
 	}
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			key := strconv.Itoa(rand.IntN(keys))
 
-			_, err := db.Get(key)
+			_, err := edb.Get(key)
 			require.NoError(b, err)
 		}
 	})
@@ -137,17 +137,17 @@ func FuzzEmbeddedDB(f *testing.F) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		err = db.Set(key, value)
+		err = edb.Set(key, value)
 		assert.NoError(t, err)
 
-		retrievedValue, err := db.Get(key)
+		retrievedValue, err := edb.Get(key)
 		assert.NoError(t, err)
 
 		assert.Equal(t, value, retrievedValue)
@@ -159,11 +159,11 @@ func TestParallelEmbeddedDB(t *testing.T) {
 
 	path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-	db, err := OpenEmbeddedDB(path)
+	edb, err := OpenEmbeddedDB(path)
 	assert.NoError(t, err)
 
 	t.Cleanup(func() {
-		assert.NoError(t, db.Close())
+		assert.NoError(t, edb.Close())
 	})
 
 	workers := 4
@@ -193,14 +193,14 @@ func TestParallelEmbeddedDB(t *testing.T) {
 			for command := range jobs {
 				switch command.typ {
 				case "set":
-					err := db.Set(command.key, kv[command.key])
+					err := edb.Set(command.key, kv[command.key])
 					assert.NoError(t, err)
 
 					sets <- command.key
 				case "get":
 					key := <-sets
 
-					value, err := db.Get(key)
+					value, err := edb.Get(key)
 					assert.NoError(t, err)
 					assert.Equal(t, kv[key], value)
 				}
@@ -230,8 +230,8 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, file.Close())
 
-		db, err := OpenEmbeddedDB(path)
-		assert.Nil(t, db)
+		edb, err := OpenEmbeddedDB(path)
+		assert.Nil(t, edb)
 		assert.Error(t, err)
 	})
 
@@ -244,8 +244,8 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		err := os.MkdirAll(path, 0o750)
 		assert.NoError(t, err)
 
-		db, err := OpenEmbeddedDB(path)
-		assert.Nil(t, db)
+		edb, err := OpenEmbeddedDB(path)
+		assert.Nil(t, edb)
 		assert.Error(t, err)
 	})
 
@@ -254,16 +254,16 @@ func TestOpenEmbeddedDB(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		assert.Equal(t, path, db.path)
-		assert.NotNil(t, db.file)
-		assert.Equal(t, path, db.file.Name())
+		assert.Equal(t, path, edb.path)
+		assert.NotNil(t, edb.file)
+		assert.Equal(t, path, edb.file.Name())
 	})
 }
 
@@ -275,11 +275,11 @@ func TestEmbeddedDBClose(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
-		assert.NoError(t, db.Close())
+		assert.NoError(t, edb.Close())
 
-		assert.ErrorIs(t, db.Close(), ErrClosed)
+		assert.ErrorIs(t, edb.Close(), ErrClosed)
 	})
 
 	t.Run("returns error if failed to sync file", func(t *testing.T) {
@@ -287,13 +287,13 @@ func TestEmbeddedDBClose(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		// Force error by manually closing file.
-		assert.NoError(t, db.file.Close())
+		assert.NoError(t, edb.file.Close())
 
-		assert.Error(t, db.Close())
+		assert.Error(t, edb.Close())
 	})
 
 	t.Run("sets closed state", func(t *testing.T) {
@@ -301,11 +301,11 @@ func TestEmbeddedDBClose(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
-		assert.NoError(t, db.Close())
+		assert.NoError(t, edb.Close())
 
-		assert.True(t, db.closed.Load())
+		assert.True(t, edb.closed.Load())
 	})
 }
 
@@ -317,11 +317,11 @@ func TestEmbeddedDBSet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
-		assert.NoError(t, db.Close())
+		assert.NoError(t, edb.Close())
 
-		assert.ErrorIs(t, db.Set("key", []byte("value")), ErrClosed)
+		assert.ErrorIs(t, edb.Set("key", []byte("value")), ErrClosed)
 	})
 
 	t.Run("returns ErrEmptyKey if key is empty", func(t *testing.T) {
@@ -329,14 +329,14 @@ func TestEmbeddedDBSet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		assert.ErrorIs(t, db.Set("", []byte("value")), ErrEmptyKey)
+		assert.ErrorIs(t, edb.Set("", []byte("value")), ErrEmptyKey)
 	})
 
 	t.Run("writes a new row to the end of the file", func(t *testing.T) {
@@ -344,28 +344,28 @@ func TestEmbeddedDBSet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		_, err = db.file.Write([]byte("D,a2V5\n"))
+		_, err = edb.file.Write([]byte("D,a2V5\n"))
 		assert.NoError(t, err)
 
-		_, err = db.file.Seek(0, io.SeekStart)
+		_, err = edb.file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		err = db.Set("key", []byte("value"))
+		err = edb.Set("key", []byte("value"))
 		assert.NoError(t, err)
 
-		_, err = db.file.Seek(0, io.SeekStart)
+		_, err = edb.file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
 		var buf bytes.Buffer
 
-		_, err = io.Copy(&buf, db.file)
+		_, err = io.Copy(&buf, edb.file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, "D,a2V5\nS,a2V5,dmFsdWU=\n", buf.String())
@@ -380,11 +380,11 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
-		assert.NoError(t, db.Close())
+		assert.NoError(t, edb.Close())
 
-		value, err := db.Get("key")
+		value, err := edb.Get("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrClosed)
 	})
@@ -394,14 +394,14 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		value, err := db.Get("")
+		value, err := edb.Get("")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrEmptyKey)
 	})
@@ -411,14 +411,14 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		value, err := db.Get("key")
+		value, err := edb.Get("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
@@ -428,18 +428,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
 		// Force error by using an invalid first column.
-		_, err = db.file.Write([]byte("X,a2V5\n"))
+		_, err = edb.file.Write([]byte("X,a2V5\n"))
 		assert.NoError(t, err)
 
-		value, err := db.Get("key")
+		value, err := edb.Get("key")
 		assert.Nil(t, value)
 
 		var ire *InvalidRowError
@@ -455,18 +455,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by omitting the , and subsequent value.
-			_, err = db.file.Write([]byte("S,a2V5\n"))
+			_, err = edb.file.Write([]byte("S,a2V5\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -479,18 +479,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by omitting the key column.
-			_, err = db.file.Write([]byte("S,,dmFsdWU=\n"))
+			_, err = edb.file.Write([]byte("S,,dmFsdWU=\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -503,18 +503,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by using invalid base64 in key column.
-			_, err = db.file.Write([]byte("S,****,dmFsdWU=\n"))
+			_, err = edb.file.Write([]byte("S,****,dmFsdWU=\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -527,18 +527,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by using invalid base64 in value column.
-			_, err = db.file.Write([]byte("S,a2V5,****\n"))
+			_, err = edb.file.Write([]byte("S,a2V5,****\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -551,17 +551,17 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
-			_, err = db.file.Write([]byte("S,a2V5,dmFsdWU=\n"))
+			_, err = edb.file.Write([]byte("S,a2V5,dmFsdWU=\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.NoError(t, err)
 			assert.Equal(t, []byte("value"), value)
 		})
@@ -571,11 +571,11 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			var b byte
@@ -595,10 +595,10 @@ func TestEmbeddedDBGet(t *testing.T) {
 			buf.Write(encodedValue)
 			buf.WriteByte('\n')
 
-			_, err = db.file.Write(buf.Bytes())
+			_, err = edb.file.Write(buf.Bytes())
 			assert.NoError(t, err)
 
-			actualValue, err := db.Get("key")
+			actualValue, err := edb.Get("key")
 			assert.NoError(t, err)
 			assert.Equal(t, value, actualValue)
 		})
@@ -612,18 +612,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by omitting the , and subsequent key.
-			_, err = db.file.Write([]byte("D\n"))
+			_, err = edb.file.Write([]byte("D\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -636,18 +636,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by omitting the , and subsequent key.
-			_, err = db.file.Write([]byte("D,\n"))
+			_, err = edb.file.Write([]byte("D,\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -660,18 +660,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			// Force error by omitting the , and subsequent key.
-			_, err = db.file.Write([]byte("D,****\n"))
+			_, err = edb.file.Write([]byte("D,****\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 
 			var ire *InvalidRowError
@@ -684,17 +684,17 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
-			_, err = db.file.Write([]byte("D,a2V5\n"))
+			_, err = edb.file.Write([]byte("D,a2V5\n"))
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, ErrNotFound)
 		})
@@ -708,11 +708,11 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			contents := bytes.Join([][]byte{
@@ -722,10 +722,10 @@ func TestEmbeddedDBGet(t *testing.T) {
 				[]byte("S,a2V5,dmFsdWUy\n"),
 			}, nil)
 
-			_, err = db.file.Write(contents)
+			_, err = edb.file.Write(contents)
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.NoError(t, err)
 			assert.Equal(t, []byte("value2"), value)
 		})
@@ -735,11 +735,11 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-			db, err := OpenEmbeddedDB(path)
+			edb, err := OpenEmbeddedDB(path)
 			assert.NoError(t, err)
 
 			defer func() {
-				assert.NoError(t, db.Close())
+				assert.NoError(t, edb.Close())
 			}()
 
 			contents := bytes.Join([][]byte{
@@ -750,10 +750,10 @@ func TestEmbeddedDBGet(t *testing.T) {
 				[]byte("D,a2V5\n"),
 			}, nil)
 
-			_, err = db.file.Write(contents)
+			_, err = edb.file.Write(contents)
 			assert.NoError(t, err)
 
-			value, err := db.Get("key")
+			value, err := edb.Get("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, ErrNotFound)
 		})
@@ -768,11 +768,11 @@ func TestEmbeddedDBDelete(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
-		assert.NoError(t, db.Close())
+		assert.NoError(t, edb.Close())
 
-		assert.ErrorIs(t, db.Delete("key"), ErrClosed)
+		assert.ErrorIs(t, edb.Delete("key"), ErrClosed)
 	})
 
 	t.Run("returns ErrEmptyKey if key is empty", func(t *testing.T) {
@@ -780,14 +780,14 @@ func TestEmbeddedDBDelete(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		assert.ErrorIs(t, db.Delete(""), ErrEmptyKey)
+		assert.ErrorIs(t, edb.Delete(""), ErrEmptyKey)
 	})
 
 	t.Run("writes a new row to the end of the file", func(t *testing.T) {
@@ -795,28 +795,28 @@ func TestEmbeddedDBDelete(t *testing.T) {
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
-		db, err := OpenEmbeddedDB(path)
+		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
 		defer func() {
-			assert.NoError(t, db.Close())
+			assert.NoError(t, edb.Close())
 		}()
 
-		_, err = db.file.Write([]byte("S,a2V5,dmFsdWU=\n"))
+		_, err = edb.file.Write([]byte("S,a2V5,dmFsdWU=\n"))
 		assert.NoError(t, err)
 
-		_, err = db.file.Seek(0, io.SeekStart)
+		_, err = edb.file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		err = db.Delete("key")
+		err = edb.Delete("key")
 		assert.NoError(t, err)
 
-		_, err = db.file.Seek(0, io.SeekStart)
+		_, err = edb.file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
 		var buf bytes.Buffer
 
-		_, err = io.Copy(&buf, db.file)
+		_, err = io.Copy(&buf, edb.file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, "S,a2V5,dmFsdWU=\nD,a2V5\n", buf.String())
