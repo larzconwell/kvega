@@ -15,6 +15,11 @@ import (
 
 var _ DB = (*EmbeddedDB)(nil)
 
+const (
+	setType    = "S"
+	deleteType = "D"
+)
+
 var (
 	// ErrEmptyKey is returned when the given key is empty.
 	ErrEmptyKey = errors.New("empty key")
@@ -114,7 +119,8 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 	}
 
 	var row bytes.Buffer
-	row.WriteString("S,")
+	row.WriteString(setType)
+	row.WriteString(",")
 	row.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
 	row.WriteString(",")
 	row.WriteString(base64.StdEncoding.EncodeToString(value))
@@ -182,7 +188,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 		columns := bytes.Split(row, []byte{','})
 		switch string(columns[0]) {
-		case "S":
+		case setType:
 			if len(columns) != 3 {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
 			}
@@ -211,7 +217,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 				value = decodedValue[:length]
 			}
-		case "D":
+		case deleteType:
 			if len(columns) != 2 {
 				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
 			}
@@ -256,7 +262,8 @@ func (edb *EmbeddedDB) Delete(key string) error {
 	}
 
 	var row bytes.Buffer
-	row.WriteString("D,")
+	row.WriteString(deleteType)
+	row.WriteString(",")
 	row.WriteString(base64.StdEncoding.EncodeToString([]byte(key)))
 	row.WriteString("\n")
 
