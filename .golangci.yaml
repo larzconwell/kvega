@@ -44,7 +44,6 @@ linters:
     - "mirror"
     - "modernize"
     - "nakedret"
-    - "nestif"
     - "noctx"
     - "noinlineerr"
     - "nolintlint"
