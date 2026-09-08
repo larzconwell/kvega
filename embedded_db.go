@@ -157,6 +157,42 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 	return nil
 }
 
+// Delete handles deleting the provided key if one exists.
+//
+// ErrClosed is returned if the database has been closed.
+func (edb *EmbeddedDB) Delete(key string) error {
+	if edb.closed.Load() {
+		return ErrClosed
+	}
+
+	if key == "" {
+		return ErrEmptyKey
+	}
+
+	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
+	row := make([]byte, 3+encodedKeyLen)
+
+	row[0] = deleteType
+	row[1] = ','
+	base64.StdEncoding.Encode(row[2:], []byte(key))
+	row[2+encodedKeyLen] = '\n'
+
+	edb.mu.Lock()
+	defer edb.mu.Unlock()
+
+	_, err := edb.file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return fmt.Errorf("failed to seek: %w", err)
+	}
+
+	_, err = edb.file.Write(row)
+	if err != nil {
+		return fmt.Errorf("failed to write row: %w", err)
+	}
+
+	return nil
+}
+
 // Get returns the value that's associated with the key if one exists.
 //
 // ErrNotFound is returned if the key was not found.
@@ -261,42 +297,6 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	}
 
 	return value, nil
-}
-
-// Delete handles deleting the provided key if one exists.
-//
-// ErrClosed is returned if the database has been closed.
-func (edb *EmbeddedDB) Delete(key string) error {
-	if edb.closed.Load() {
-		return ErrClosed
-	}
-
-	if key == "" {
-		return ErrEmptyKey
-	}
-
-	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
-	row := make([]byte, 3+encodedKeyLen)
-
-	row[0] = deleteType
-	row[1] = ','
-	base64.StdEncoding.Encode(row[2:], []byte(key))
-	row[2+encodedKeyLen] = '\n'
-
-	edb.mu.Lock()
-	defer edb.mu.Unlock()
-
-	_, err := edb.file.Seek(0, io.SeekEnd)
-	if err != nil {
-		return fmt.Errorf("failed to seek: %w", err)
-	}
-
-	_, err = edb.file.Write(row)
-	if err != nil {
-		return fmt.Errorf("failed to write row: %w", err)
-	}
-
-	return nil
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,
