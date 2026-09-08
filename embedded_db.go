@@ -38,11 +38,16 @@ type row struct {
 
 // InvalidRowError represents invalid database row data and the cause for the invalid data.
 type InvalidRowError struct {
+	key   string
 	cause error
 }
 
 // Error implements error interface.
 func (ire *InvalidRowError) Error() string {
+	if ire.key != "" {
+		return fmt.Sprintf(`invalid row data for key "%s": %s`, ire.key, ire.cause.Error())
+	}
+
 	return "invalid row data: " + ire.cause.Error()
 }
 
@@ -221,25 +226,25 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	switch foundRow.typ {
 	case setType:
 		if foundRow.encodedValue == nil {
-			return nil, &InvalidRowError{cause: ErrInvalidRowColumns}
+			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumns}
 		}
 
 		decodedValue := make([]byte, base64.StdEncoding.EncodedLen(len(foundRow.encodedValue)))
 
 		n, err := base64.StdEncoding.Decode(decodedValue, foundRow.encodedValue)
 		if err != nil {
-			return nil, &InvalidRowError{cause: ErrInvalidRowColumn}
+			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumn}
 		}
 
 		return decodedValue[:n], nil
 	case deleteType:
 		if foundRow.encodedValue != nil {
-			return nil, &InvalidRowError{cause: ErrInvalidRowColumns}
+			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumns}
 		}
 
 		return nil, ErrNotFound
 	default:
-		return nil, &InvalidRowError{cause: ErrInvalidRowType}
+		return nil, &InvalidRowError{key: key, cause: ErrInvalidRowType}
 	}
 }
 

@@ -323,7 +323,7 @@ func TestOpenEmbeddedDB(t *testing.T) {
 
 		var ire *InvalidRowError
 		assert.ErrorAs(t, err, &ire)
-		assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumns)
+		assert.ErrorIs(t, ire.cause, ErrInvalidRowColumns)
 	})
 
 	t.Run("builds an index of keys to file offsets", func(t *testing.T) {
@@ -635,7 +635,8 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 		var ire *InvalidRowError
 		assert.ErrorAs(t, err, &ire)
-		assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowType)
+		assert.ErrorIs(t, ire.cause, ErrInvalidRowType)
+		assert.Equal(t, "key", ire.key)
 	})
 
 	t.Run("reading set data", func(t *testing.T) {
@@ -662,7 +663,8 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumns)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumns)
+			assert.Equal(t, "key", ire.key)
 		})
 
 		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with an empty key column", func(t *testing.T) {
@@ -686,7 +688,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
 		})
 
 		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a key that's not encoded as expected", func(t *testing.T) {
@@ -710,7 +712,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
 		})
 
 		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a value that's not encoded as expected", func(t *testing.T) {
@@ -734,7 +736,8 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
+			assert.Equal(t, "key", ire.key)
 		})
 
 		t.Run("returns the value stored in the row for the key", func(t *testing.T) {
@@ -808,7 +811,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumns)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumns)
 		})
 
 		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with an empty key column", func(t *testing.T) {
@@ -832,7 +835,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
 		})
 
 		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a key that's not encoded as expected", func(t *testing.T) {
@@ -856,7 +859,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			var ire *InvalidRowError
 			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.Unwrap(), ErrInvalidRowColumn)
+			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
 		})
 
 		t.Run("returns ErrNotFound when a delete row is found for the key", func(t *testing.T) {
