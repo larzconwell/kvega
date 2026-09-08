@@ -30,15 +30,20 @@ var (
 	ErrInvalidRowColumn = errors.New("invalid row column")
 )
 
+type row struct {
+	typ          byte
+	key          string
+	encodedValue []byte
+}
+
 // InvalidRowError represents invalid database row data and the cause for the invalid data.
 type InvalidRowError struct {
-	row   int
 	cause error
 }
 
 // Error implements error interface.
 func (ire *InvalidRowError) Error() string {
-	return fmt.Sprintf("invalid row data on row %d: %s", ire.row, ire.cause.Error())
+	return "invalid row data: " + ire.cause.Error()
 }
 
 // Unwrap implements error unwrapping for errors.Is/errors.As.
@@ -209,104 +214,125 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	edb.mu.Lock()
 	defer edb.mu.Unlock()
 
-	offset, foundIndex := edb.index[key]
+	offset, foundOffset := edb.index[key]
 
 	_, err := edb.file.Seek(offset, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to seek: %w", err)
 	}
 
-	var (
-		count int
-		value []byte
-	)
-
 	reader := csv.NewReader(edb.file)
 	reader.Comma = ','
 	reader.FieldsPerRecord = -1
 	reader.ReuseRecord = true
 
-	for {
-		count++
+	var foundRow row
 
-		columns, err := reader.Read()
-		if errors.Is(err, io.EOF) {
-			break
+	if foundOffset {
+		row, err := edb.readRow(reader)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return nil, err
 		}
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to read row: %w", err)
+		if row.key == key {
+			foundRow = row
 		}
-
-		switch columns[0] {
-		case string(setType):
-			if len(columns) != 3 {
-				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
+	} else {
+		for {
+			row, err := edb.readRow(reader)
+			if errors.Is(err, io.EOF) {
+				break
 			}
 
-			encodedKey := columns[1]
-			encodedValue := columns[2]
-
-			if len(encodedKey) == 0 {
-				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
-			}
-
-			decodedKey, err := base64.StdEncoding.DecodeString(encodedKey)
 			if err != nil {
-				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+				return nil, err
 			}
 
-			if string(decodedKey) == key {
-				decodedValue, err := base64.StdEncoding.DecodeString(encodedValue)
-				if err != nil {
-					return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
-				}
-
-				value = decodedValue
+			if row.key == key {
+				foundRow = row
 			}
-		case string(deleteType):
-			if len(columns) != 2 {
-				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
-			}
-
-			encodedKey := columns[1]
-			if len(encodedKey) == 0 {
-				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
-			}
-
-			decodedKey, err := base64.StdEncoding.DecodeString(encodedKey)
-			if err != nil {
-				return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
-			}
-
-			if string(decodedKey) == key {
-				value = nil
-			}
-		default:
-			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowType}
-		}
-
-		// If we found the key in the index we only need to read a single row.
-		if foundIndex {
-			break
 		}
 	}
 
-	if value == nil {
+	if foundRow.key == "" {
 		return nil, ErrNotFound
 	}
 
-	return value, nil
+	switch foundRow.typ {
+	case setType:
+		if foundRow.encodedValue == nil {
+			return nil, &InvalidRowError{cause: ErrInvalidRowColumns}
+		}
+
+		decodedValue := make([]byte, base64.StdEncoding.EncodedLen(len(foundRow.encodedValue)))
+
+		n, err := base64.StdEncoding.Decode(decodedValue, foundRow.encodedValue)
+		if err != nil {
+			return nil, &InvalidRowError{cause: ErrInvalidRowColumn}
+		}
+
+		return decodedValue[:n], nil
+	case deleteType:
+		if foundRow.encodedValue != nil {
+			return nil, &InvalidRowError{cause: ErrInvalidRowColumns}
+		}
+
+		return nil, ErrNotFound
+	default:
+		return nil, &InvalidRowError{cause: ErrInvalidRowType}
+	}
+}
+
+// readRow reads one row from the given CSV reader, returning io.EOF
+// if we've reached the end of the file. All validation are done in
+// readRow except validating the row type and any value in the row.
+func (edb *EmbeddedDB) readRow(reader *csv.Reader) (row, error) {
+	columns, err := reader.Read()
+	if errors.Is(err, io.EOF) {
+		return row{}, io.EOF
+	}
+
+	if err != nil {
+		return row{}, fmt.Errorf("failed to read row: %w", err)
+	}
+
+	if len(columns) < 2 {
+		return row{}, &InvalidRowError{cause: ErrInvalidRowColumns}
+	}
+
+	if len(columns[0]) != 1 {
+		return row{}, &InvalidRowError{cause: ErrInvalidRowType}
+	}
+
+	typ := columns[0][0]
+
+	encodedKey := columns[1]
+	if len(encodedKey) == 0 {
+		return row{}, &InvalidRowError{cause: ErrInvalidRowColumn}
+	}
+
+	decodedKey, err := base64.StdEncoding.DecodeString(encodedKey)
+	if err != nil {
+		return row{}, &InvalidRowError{cause: ErrInvalidRowColumn}
+	}
+
+	var encodedValue []byte
+	if len(columns) > 2 {
+		encodedValue = []byte(columns[2])
+	}
+
+	return row{
+		typ:          typ,
+		key:          string(decodedKey),
+		encodedValue: encodedValue,
+	}, nil
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,
 // it locates the last instance of any keys found in the file. buildIndex only
 // does minimal validation to get valid keys from the file.
 func (edb *EmbeddedDB) buildIndex() error {
-	var (
-		count  int
-		offset int64
-	)
+	var offset int64
 
 	_, err := edb.file.Seek(0, io.SeekStart)
 	if err != nil {
@@ -320,28 +346,16 @@ func (edb *EmbeddedDB) buildIndex() error {
 	reader.ReuseRecord = true
 
 	for {
-		count++
-
-		columns, err := reader.Read()
+		row, err := edb.readRow(reader)
 		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
-			return fmt.Errorf("failed to read row: %w", err)
+			return err
 		}
 
-		// All row type have at least 2 columns, the row type, and a key.
-		if len(columns) < 2 {
-			return &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
-		}
-
-		decodedKey, err := base64.StdEncoding.DecodeString(columns[1])
-		if err != nil {
-			return &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
-		}
-
-		index[string(decodedKey)] = offset
+		index[row.key] = offset
 		offset = reader.InputOffset()
 	}
 
