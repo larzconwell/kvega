@@ -639,6 +639,54 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.Equal(t, "key", ire.key)
 	})
 
+	t.Run("reads row at index offset if found for key", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Set("key", []byte("value")))
+		assert.NoError(t, edb.Set("key", []byte("value2")))
+
+		// Force a read for the first row to validate it uses the index.
+		assert.NotEqual(t, 0, edb.index["key"])
+		edb.index["key"] = 0
+
+		value, err := edb.Get("key")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("value"), value)
+	})
+
+	t.Run("reads all rows to find key if not found in the index", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Set("key", []byte("value")))
+		assert.NoError(t, edb.Set("key", []byte("value2")))
+
+		// Empty out index to force unindexed path.
+		assert.NotEmpty(t, edb.index)
+		edb.index = nil
+
+		value, err := edb.Get("key")
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("value2"), value)
+	})
+
 	t.Run("reading set data", func(t *testing.T) {
 		t.Parallel()
 
