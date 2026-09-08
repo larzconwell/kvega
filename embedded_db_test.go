@@ -20,35 +20,6 @@ type command struct {
 	key string
 }
 
-func BenchmarkEmbeddedDBBuildIndex(b *testing.B) {
-	path := filepath.Join(b.ArtifactDir(), "db.kvega")
-
-	edb, err := OpenEmbeddedDB(path)
-	require.NoError(b, err)
-
-	defer func() {
-		require.NoError(b, edb.Close())
-	}()
-
-	// Using math/rand/v2 is good enough for this.
-	//gosec:disable G404
-	rand := rand.New(rand.NewPCG(0, 0))
-
-	for range 100_000 {
-		key := strconv.Itoa(rand.IntN(70_000))
-		require.NoError(b, edb.Set(key, []byte("value")))
-	}
-
-	for b.Loop() {
-		edb, err := OpenEmbeddedDB(path)
-
-		b.StopTimer()
-		require.NoError(b, err)
-		require.NoError(b, edb.Close())
-		b.StartTimer()
-	}
-}
-
 func BenchmarkEmbeddedDBSet(b *testing.B) {
 	path := filepath.Join(b.ArtifactDir(), "db.kvega")
 
@@ -86,6 +57,10 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
+	defer func() {
+		require.NoError(b, edb.Close())
+	}()
+
 	// Using math/rand/v2 is good enough for this.
 	//gosec:disable G404
 	rand := rand.New(rand.NewPCG(0, 0))
@@ -102,15 +77,7 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
-	require.NoError(b, edb.Close())
-
-	// Reopen embedded db to ensure index, etc. is set.
-	edb, err = OpenEmbeddedDB(path)
-	require.NoError(b, err)
-
-	defer func() {
-		require.NoError(b, edb.Close())
-	}()
+	require.NoError(b, edb.buildIndex())
 
 	for b.Loop() {
 		b.StopTimer()
@@ -130,6 +97,10 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
+	defer func() {
+		require.NoError(b, edb.Close())
+	}()
+
 	// Using math/rand/v2 is good enough for this.
 	//gosec:disable G404
 	rand := rand.New(rand.NewPCG(0, 0))
@@ -146,15 +117,7 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
-	require.NoError(b, edb.Close())
-
-	// Reopen embedded db to ensure index, etc. is set.
-	edb, err = OpenEmbeddedDB(path)
-	require.NoError(b, err)
-
-	defer func() {
-		require.NoError(b, edb.Close())
-	}()
+	require.NoError(b, edb.buildIndex())
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -172,6 +135,10 @@ func BenchmarkEmbeddedDBGetErrNotFound(b *testing.B) {
 	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
+	defer func() {
+		require.NoError(b, edb.Close())
+	}()
+
 	// Using math/rand/v2 is good enough for this.
 	//gosec:disable G404
 	rand := rand.New(rand.NewPCG(0, 0))
@@ -188,19 +155,35 @@ func BenchmarkEmbeddedDBGetErrNotFound(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
-	require.NoError(b, edb.Close())
+	require.NoError(b, edb.buildIndex())
 
-	// Reopen embedded db to ensure index, etc. is set.
-	edb, err = OpenEmbeddedDB(path)
+	for b.Loop() {
+		_, err := edb.Get("not_found")
+		require.ErrorIs(b, err, ErrNotFound)
+	}
+}
+
+func BenchmarkEmbeddedDBBuildIndex(b *testing.B) {
+	path := filepath.Join(b.ArtifactDir(), "db.kvega")
+
+	edb, err := OpenEmbeddedDB(path)
 	require.NoError(b, err)
 
 	defer func() {
 		require.NoError(b, edb.Close())
 	}()
 
+	// Using math/rand/v2 is good enough for this.
+	//gosec:disable G404
+	rand := rand.New(rand.NewPCG(0, 0))
+
+	for range 100_000 {
+		key := strconv.Itoa(rand.IntN(70_000))
+		require.NoError(b, edb.Set(key, []byte("value")))
+	}
+
 	for b.Loop() {
-		_, err := edb.Get("not_found")
-		require.ErrorIs(b, err, ErrNotFound)
+		require.NoError(b, edb.buildIndex())
 	}
 }
 
@@ -338,7 +321,7 @@ func TestOpenEmbeddedDB(t *testing.T) {
 
 		assert.NoError(t, edb.Close())
 
-		// Reopen embedded db to set index.
+		// Reopen db to get the index built on open.
 		edb, err = OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 		assert.NoError(t, edb.Close())

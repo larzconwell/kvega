@@ -77,7 +77,9 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
 
-	index, err := buildIndex(file)
+	edb := &EmbeddedDB{path: path, file: file}
+
+	err = edb.buildIndex()
 	if err != nil {
 		// The index building error is more important to surface.
 		//nolint:errcheck
@@ -87,7 +89,7 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 		return nil, err
 	}
 
-	return &EmbeddedDB{path: path, index: index, file: file}, nil
+	return edb, nil
 }
 
 // Close handles flushing caches and releasing resources related to the EmbeddedDB.
@@ -298,18 +300,21 @@ func (edb *EmbeddedDB) Delete(key string) error {
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,
-// it locates the last instance of any keys found in the file. The file is
-// expected to be set to the beginning of the file, i.e. no seek occurs.
-// buildIndex only does minimal validation to get valid keys from the file.
-func buildIndex(file *os.File) (map[string]int64, error) {
+// it locates the last instance of any keys found in the file. buildIndex only
+// does minimal validation to get valid keys from the file.
+func (edb *EmbeddedDB) buildIndex() error {
 	var (
 		count  int
 		offset int64
 	)
 
-	index := make(map[string]int64)
+	_, err := edb.file.Seek(0, io.SeekStart)
+	if err != nil {
+		return fmt.Errorf("failed to seek: %w", err)
+	}
 
-	reader := csv.NewReader(file)
+	index := make(map[string]int64)
+	reader := csv.NewReader(edb.file)
 	reader.Comma = ','
 	reader.FieldsPerRecord = -1
 	reader.ReuseRecord = true
@@ -323,22 +328,24 @@ func buildIndex(file *os.File) (map[string]int64, error) {
 		}
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to read row: %w", err)
+			return fmt.Errorf("failed to read row: %w", err)
 		}
 
 		// All row type have at least 2 columns, the row type, and a key.
 		if len(columns) < 2 {
-			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
+			return &InvalidRowError{row: count, cause: ErrInvalidRowColumns}
 		}
 
 		decodedKey, err := base64.StdEncoding.DecodeString(columns[1])
 		if err != nil {
-			return nil, &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
+			return &InvalidRowError{row: count, cause: ErrInvalidRowColumn}
 		}
 
 		index[string(decodedKey)] = offset
 		offset = reader.InputOffset()
 	}
 
-	return index, nil
+	edb.index = index
+
+	return nil
 }
