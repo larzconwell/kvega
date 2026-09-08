@@ -135,31 +135,12 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 		return ErrEmptyKey
 	}
 
-	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
-	encodedValueLen := base64.StdEncoding.EncodedLen(len(value))
-	row := make([]byte, 4+encodedKeyLen+encodedValueLen)
-
-	row[0] = setType
-	row[1] = ','
-	base64.StdEncoding.Encode(row[2:], []byte(key))
-	row[2+encodedKeyLen] = ','
-	base64.StdEncoding.Encode(row[3+encodedKeyLen:], value)
-	row[3+encodedKeyLen+encodedValueLen] = '\n'
-
-	edb.mu.Lock()
-	defer edb.mu.Unlock()
-
-	_, err := edb.file.Seek(0, io.SeekEnd)
-	if err != nil {
-		return fmt.Errorf("failed to seek: %w", err)
+	// Value needs to be allocated so it writes a value to the file.
+	if value == nil {
+		value = make([]byte, 0)
 	}
 
-	_, err = edb.file.Write(row)
-	if err != nil {
-		return fmt.Errorf("failed to write row: %w", err)
-	}
-
-	return nil
+	return edb.writeRow(setType, []byte(key), value)
 }
 
 // Delete handles deleting the provided key if one exists.
@@ -174,28 +155,7 @@ func (edb *EmbeddedDB) Delete(key string) error {
 		return ErrEmptyKey
 	}
 
-	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
-	row := make([]byte, 3+encodedKeyLen)
-
-	row[0] = deleteType
-	row[1] = ','
-	base64.StdEncoding.Encode(row[2:], []byte(key))
-	row[2+encodedKeyLen] = '\n'
-
-	edb.mu.Lock()
-	defer edb.mu.Unlock()
-
-	_, err := edb.file.Seek(0, io.SeekEnd)
-	if err != nil {
-		return fmt.Errorf("failed to seek: %w", err)
-	}
-
-	_, err = edb.file.Write(row)
-	if err != nil {
-		return fmt.Errorf("failed to write row: %w", err)
-	}
-
-	return nil
+	return edb.writeRow(deleteType, []byte(key), nil)
 }
 
 // Get returns the value that's associated with the key if one exists.
@@ -281,6 +241,53 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	default:
 		return nil, &InvalidRowError{cause: ErrInvalidRowType}
 	}
+}
+
+func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
+	var encodedValueLen int
+
+	baseRowLen := 3
+	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
+
+	if value != nil {
+		baseRowLen++
+		encodedValueLen = base64.StdEncoding.EncodedLen(len(value))
+	}
+
+	row := make([]byte, baseRowLen+encodedKeyLen+encodedValueLen)
+
+	row[0] = typ
+	row[1] = ','
+	rowOffset := 2
+
+	base64.StdEncoding.Encode(row[rowOffset:], key)
+	rowOffset += encodedKeyLen
+
+	if value != nil {
+		row[rowOffset] = ','
+		rowOffset++
+
+		base64.StdEncoding.Encode(row[rowOffset:], value)
+		rowOffset += encodedValueLen
+	}
+
+	fmt.Println(string(row))
+	row[rowOffset] = '\n'
+
+	edb.mu.Lock()
+	defer edb.mu.Unlock()
+
+	_, err := edb.file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return fmt.Errorf("failed to seek: %w", err)
+	}
+
+	_, err = edb.file.Write(row)
+	if err != nil {
+		return fmt.Errorf("failed to write row: %w", err)
+	}
+
+	return nil
 }
 
 // readRow reads one row from the given CSV reader, returning io.EOF
