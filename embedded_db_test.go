@@ -77,8 +77,6 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
-	require.NoError(b, edb.buildIndex())
-
 	for b.Loop() {
 		b.StopTimer()
 
@@ -117,8 +115,6 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
-	require.NoError(b, edb.buildIndex())
-
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			key := strconv.Itoa(rand.IntN(keys))
@@ -154,8 +150,6 @@ func BenchmarkEmbeddedDBGetErrNotFound(b *testing.B) {
 
 		require.NoError(b, edb.Set(key, value))
 	}
-
-	require.NoError(b, edb.buildIndex())
 
 	for b.Loop() {
 		_, err := edb.Get("not_found")
@@ -474,6 +468,24 @@ func TestEmbeddedDBSet(t *testing.T) {
 
 		assert.Equal(t, "D,a2V5\nS,a2V5,dmFsdWU=\n", buf.String())
 	})
+
+	t.Run("updates the index for the key", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Delete("key"))
+		assert.NoError(t, edb.Set("key", []byte("value")))
+
+		assert.Equal(t, int64(7), edb.index["key"])
+	})
 }
 
 func TestEmbeddedDBDelete(t *testing.T) {
@@ -530,6 +542,24 @@ func TestEmbeddedDBDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, "S,a2V5,dmFsdWU=\nD,a2V5\n", buf.String())
+	})
+
+	t.Run("updates the index for the key", func(t *testing.T) {
+		t.Parallel()
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Set("key", []byte("value")))
+		assert.NoError(t, edb.Delete("key"))
+
+		assert.Equal(t, int64(16), edb.index["key"])
 	})
 }
 

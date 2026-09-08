@@ -271,13 +271,12 @@ func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
 		rowOffset += encodedValueLen
 	}
 
-	fmt.Println(string(row))
 	row[rowOffset] = '\n'
 
 	edb.mu.Lock()
 	defer edb.mu.Unlock()
 
-	_, err := edb.file.Seek(0, io.SeekEnd)
+	offset, err := edb.file.Seek(0, io.SeekEnd)
 	if err != nil {
 		return fmt.Errorf("failed to seek: %w", err)
 	}
@@ -286,6 +285,8 @@ func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to write row: %w", err)
 	}
+
+	edb.index[string(key)] = offset
 
 	return nil
 }
