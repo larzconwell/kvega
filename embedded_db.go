@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -62,9 +63,15 @@ type EmbeddedDB struct {
 	path   string
 	closed atomic.Bool
 
-	mu    sync.Mutex
+	imu   sync.Mutex
 	index map[string]int64
-	file  *os.File
+
+	wmu    sync.Mutex
+	writer *os.File
+
+	readCounter atomic.Int32
+	rmus        []sync.Mutex
+	readers     []*os.File
 }
 
 // OpenEmbeddedDB opens the database located at the given path, creating it if it doesn't exist.
@@ -82,19 +89,55 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 
 	// The caller should ensure the provided path is safe to open.
 	//gosec:disable G304
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_SYNC, 0o600)
+	writer, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0o600)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %w", err)
+		return nil, fmt.Errorf("failed to create writer: %w", err)
 	}
 
-	edb := &EmbeddedDB{path: path, file: file}
+	readers := make([]*os.File, runtime.GOMAXPROCS(0))
+	for idx := range readers {
+		// The caller should ensure the provided path is safe to open.
+		//gosec:disable G304
+		reader, err := os.Open(path)
+		if err != nil {
+			// The last open error is more important to surface.
+			//nolint:errcheck
+			//gosec:disable G104
+			writer.Close()
+
+			for _, reader := range readers[:idx] {
+				// The last open error is more important to surface.
+				//nolint:errcheck
+				//gosec:disable G104
+				reader.Close()
+			}
+
+			return nil, fmt.Errorf("failed to create reader: %w", err)
+		}
+
+		readers[idx] = reader
+	}
+
+	edb := &EmbeddedDB{
+		path:    path,
+		writer:  writer,
+		rmus:    make([]sync.Mutex, len(readers)),
+		readers: readers,
+	}
 
 	err = edb.buildIndex()
 	if err != nil {
 		// The index building error is more important to surface.
 		//nolint:errcheck
 		//gosec:disable G104
-		file.Close()
+		writer.Close()
+
+		for _, reader := range readers {
+			// The index building error is more important to surface.
+			//nolint:errcheck
+			//gosec:disable G104
+			reader.Close()
+		}
 
 		return nil, err
 	}
@@ -110,20 +153,30 @@ func (edb *EmbeddedDB) Close() error {
 		return ErrClosed
 	}
 
-	edb.mu.Lock()
-	defer edb.mu.Unlock()
-
-	err := edb.file.Sync()
-	if err != nil {
-		return fmt.Errorf("failed to sync file: %w", err)
-	}
-
-	err = edb.file.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close file: %w", err)
-	}
-
 	edb.closed.Store(true)
+
+	edb.wmu.Lock()
+	defer edb.wmu.Unlock()
+
+	err := edb.writer.Sync()
+	if err != nil {
+		return fmt.Errorf("failed to sync writer: %w", err)
+	}
+
+	err = edb.writer.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close writer: %w", err)
+	}
+
+	for idx, reader := range edb.readers {
+		edb.rmus[idx].Lock()
+		err := reader.Close()
+		edb.rmus[idx].Unlock()
+
+		if err != nil {
+			return fmt.Errorf("failed to close reader: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -176,17 +229,24 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		return nil, ErrEmptyKey
 	}
 
-	edb.mu.Lock()
-	defer edb.mu.Unlock()
+	idx := int(edb.readCounter.Add(1)) % len(edb.readers)
+	idx = max(-idx, idx) // Non branching way to get absolute value, doesn't work at math.MinInt
 
+	edb.rmus[idx].Lock()
+	defer edb.rmus[idx].Unlock()
+
+	edb.imu.Lock()
 	offset, foundOffset := edb.index[key]
+	edb.imu.Unlock()
 
-	_, err := edb.file.Seek(offset, io.SeekStart)
+	file := edb.readers[idx]
+
+	_, err := file.Seek(offset, io.SeekStart)
 	if err != nil {
-		return nil, fmt.Errorf("failed to seek: %w", err)
+		return nil, fmt.Errorf("failed to seek reader: %w", err)
 	}
 
-	reader := csv.NewReader(edb.file)
+	reader := csv.NewReader(file)
 	reader.Comma = ','
 	reader.FieldsPerRecord = -1
 	reader.ReuseRecord = true
@@ -276,20 +336,23 @@ func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
 
 	row[rowOffset] = '\n'
 
-	edb.mu.Lock()
-	defer edb.mu.Unlock()
+	edb.wmu.Lock()
+	defer edb.wmu.Unlock()
 
-	offset, err := edb.file.Seek(0, io.SeekEnd)
+	// Doesn't actually seek, retrieves current offset.
+	offset, err := edb.writer.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return fmt.Errorf("failed to seek: %w", err)
+		return fmt.Errorf("failed to seek writer: %w", err)
 	}
 
-	_, err = edb.file.Write(row)
+	_, err = edb.writer.Write(row)
 	if err != nil {
 		return fmt.Errorf("failed to write row: %w", err)
 	}
 
+	edb.imu.Lock()
 	edb.index[string(key)] = offset
+	edb.imu.Unlock()
 
 	return nil
 }
@@ -340,18 +403,21 @@ func (edb *EmbeddedDB) readRow(reader *csv.Reader) (row, error) {
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,
-// it locates the last instance of any keys found in the file. buildIndex only
-// does minimal validation to get valid keys from the file.
+// it locates the last instance of any keys found in the file. buildIndex
+// does not take a lock, it is not safe to call concurrently. It only does
+// minimal validation to get valid keys from the file.
 func (edb *EmbeddedDB) buildIndex() error {
 	var offset int64
 
-	_, err := edb.file.Seek(0, io.SeekStart)
+	file := edb.readers[0]
+
+	_, err := file.Seek(0, io.SeekStart)
 	if err != nil {
-		return fmt.Errorf("failed to seek: %w", err)
+		return fmt.Errorf("failed to seek reader: %w", err)
 	}
 
 	index := make(map[string]int64)
-	reader := csv.NewReader(edb.file)
+	reader := csv.NewReader(file)
 	reader.Comma = ','
 	reader.FieldsPerRecord = -1
 	reader.ReuseRecord = true

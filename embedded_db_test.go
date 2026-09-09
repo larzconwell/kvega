@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -375,9 +376,11 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		}()
 
 		assert.Equal(t, path, edb.path)
-		assert.Equal(t, path, edb.file.Name())
 		assert.NotNil(t, edb.index)
-		assert.NotNil(t, edb.file)
+		assert.NotNil(t, edb.writer)
+		assert.Equal(t, path, edb.writer.Name())
+		assert.Len(t, edb.rmus, runtime.GOMAXPROCS(0))
+		assert.Len(t, edb.readers, runtime.GOMAXPROCS(0))
 	})
 }
 
@@ -396,7 +399,7 @@ func TestEmbeddedDBClose(t *testing.T) {
 		assert.ErrorIs(t, edb.Close(), ErrClosed)
 	})
 
-	t.Run("returns error if failed to sync file", func(t *testing.T) {
+	t.Run("returns error if failed to sync writer", func(t *testing.T) {
 		t.Parallel()
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
@@ -404,8 +407,12 @@ func TestEmbeddedDBClose(t *testing.T) {
 		edb, err := OpenEmbeddedDB(path)
 		assert.NoError(t, err)
 
-		// Force error by manually closing file.
-		assert.NoError(t, edb.file.Close())
+		// Force error by manually closing writer.
+		assert.NoError(t, edb.writer.Close())
+		// Manually clean up readers.
+		for _, reader := range edb.readers {
+			assert.NoError(t, reader.Close())
+		}
 
 		assert.Error(t, edb.Close())
 	})
@@ -468,12 +475,13 @@ func TestEmbeddedDBSet(t *testing.T) {
 		assert.NoError(t, edb.Delete("key"))
 		assert.NoError(t, edb.Set("key", []byte("value")))
 
-		_, err = edb.file.Seek(0, io.SeekStart)
+		file := edb.readers[0]
+		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
 		var buf bytes.Buffer
 
-		_, err = io.Copy(&buf, edb.file)
+		_, err = io.Copy(&buf, file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, "D,a2V5\nS,a2V5,dmFsdWU=\n", buf.String())
@@ -543,12 +551,13 @@ func TestEmbeddedDBDelete(t *testing.T) {
 		assert.NoError(t, edb.Set("key", []byte("value")))
 		assert.NoError(t, edb.Delete("key"))
 
-		_, err = edb.file.Seek(0, io.SeekStart)
+		file := edb.readers[0]
+		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
 		var buf bytes.Buffer
 
-		_, err = io.Copy(&buf, edb.file)
+		_, err = io.Copy(&buf, file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, "S,a2V5,dmFsdWU=\nD,a2V5\n", buf.String())
@@ -637,7 +646,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 		}()
 
 		// Force error by using an invalid row type.
-		_, err = edb.file.WriteString("X,a2V5\n")
+		_, err = edb.writer.WriteString("X,a2V5\n")
 		assert.NoError(t, err)
 
 		value, err := edb.Get("key")
@@ -713,7 +722,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by omitting the , and subsequent value.
-			_, err = edb.file.WriteString("S,a2V5\n")
+			_, err = edb.writer.WriteString("S,a2V5\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -738,7 +747,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by omitting the key column.
-			_, err = edb.file.WriteString("S,,dmFsdWU=\n")
+			_, err = edb.writer.WriteString("S,,dmFsdWU=\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -762,7 +771,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by using invalid base64 in key column.
-			_, err = edb.file.WriteString("S,****,dmFsdWU=\n")
+			_, err = edb.writer.WriteString("S,****,dmFsdWU=\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -786,7 +795,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by using invalid base64 in value column.
-			_, err = edb.file.WriteString("S,a2V5,****\n")
+			_, err = edb.writer.WriteString("S,a2V5,****\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -861,7 +870,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by omitting the , and subsequent key.
-			_, err = edb.file.WriteString("D\n")
+			_, err = edb.writer.WriteString("D\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -885,7 +894,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by omitting the key.
-			_, err = edb.file.WriteString("D,\n")
+			_, err = edb.writer.WriteString("D,\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -909,7 +918,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by using invalid base64 in key column.
-			_, err = edb.file.WriteString("D,****\n")
+			_, err = edb.writer.WriteString("D,****\n")
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
