@@ -33,7 +33,7 @@ var (
 type row struct {
 	typ          byte
 	key          string
-	encodedValue []byte
+	encodedValue string
 }
 
 // InvalidRowError represents invalid database row data and the cause for the invalid data.
@@ -225,20 +225,18 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 	switch foundRow.typ {
 	case setType:
-		if foundRow.encodedValue == nil {
+		if foundRow.encodedValue == "" {
 			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumns}
 		}
 
-		decodedValue := make([]byte, base64.StdEncoding.EncodedLen(len(foundRow.encodedValue)))
-
-		n, err := base64.StdEncoding.Decode(decodedValue, foundRow.encodedValue)
+		decodedValue, err := base64.StdEncoding.DecodeString(foundRow.encodedValue)
 		if err != nil {
 			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumn}
 		}
 
-		return decodedValue[:n], nil
+		return decodedValue, nil
 	case deleteType:
-		if foundRow.encodedValue != nil {
+		if foundRow.encodedValue != "" {
 			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumns}
 		}
 
@@ -329,9 +327,9 @@ func (edb *EmbeddedDB) readRow(reader *csv.Reader) (row, error) {
 		return row{}, &InvalidRowError{cause: ErrInvalidRowColumn}
 	}
 
-	var encodedValue []byte
+	var encodedValue string
 	if len(columns) > 2 {
-		encodedValue = []byte(columns[2])
+		encodedValue = columns[2]
 	}
 
 	return row{
