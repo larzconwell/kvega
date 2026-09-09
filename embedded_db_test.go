@@ -35,6 +35,8 @@ func BenchmarkEmbeddedDBSet(b *testing.B) {
 	rand := rand.New(rand.NewPCG(0, 0))
 	count := -1
 
+	b.ResetTimer()
+
 	for b.Loop() {
 		b.StopTimer()
 
@@ -77,6 +79,8 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
+	b.ResetTimer()
+
 	for b.Loop() {
 		b.StopTimer()
 
@@ -115,6 +119,8 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
+	b.ResetTimer()
+
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			key := strconv.Itoa(rand.IntN(keys))
@@ -151,6 +157,8 @@ func BenchmarkEmbeddedDBGetErrNotFound(b *testing.B) {
 		require.NoError(b, edb.Set(key, value))
 	}
 
+	b.ResetTimer()
+
 	for b.Loop() {
 		_, err := edb.Get("not_found")
 		require.ErrorIs(b, err, ErrNotFound)
@@ -175,6 +183,8 @@ func BenchmarkEmbeddedDBBuildIndex(b *testing.B) {
 		key := strconv.Itoa(rand.IntN(70_000))
 		require.NoError(b, edb.Set(key, []byte("value")))
 	}
+
+	b.ResetTimer()
 
 	for b.Loop() {
 		require.NoError(b, edb.buildIndex())
