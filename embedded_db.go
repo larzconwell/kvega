@@ -306,6 +306,11 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	}
 }
 
+// writeRow writes the given row data and updates the index for the
+// key to point to the offset for the newly written row. The value
+// argument is only written if not nil, care must be taken by the
+// caller to ensure that nil is only passed if there is no value
+// intended to be written.
 func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
 	var encodedValueLen int
 
