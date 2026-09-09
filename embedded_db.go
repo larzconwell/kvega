@@ -22,13 +22,13 @@ const (
 
 var (
 	// ErrEmptyKey is returned when the given key is empty.
-	ErrEmptyKey = errors.New("empty key")
+	ErrEmptyKey = errors.New("kvega: empty key")
 	// ErrInvalidRowType is returned when row data has an invalid type.
-	ErrInvalidRowType = errors.New("invalid row type")
+	ErrInvalidRowType = errors.New("kvega: invalid row type")
 	// ErrInvalidRowColumns is returned when row data contains an invalid number of columns.
-	ErrInvalidRowColumns = errors.New("invalid row columns")
+	ErrInvalidRowColumns = errors.New("kvega: invalid row columns")
 	// ErrInvalidRowColumn is returned when row data contains invalid column data.
-	ErrInvalidRowColumn = errors.New("invalid row column")
+	ErrInvalidRowColumn = errors.New("kvega: invalid row column")
 )
 
 type row struct {
@@ -46,10 +46,10 @@ type InvalidRowError struct {
 // Error implements error interface.
 func (ire *InvalidRowError) Error() string {
 	if ire.key != "" {
-		return fmt.Sprintf(`invalid row data for key "%s": %s`, ire.key, ire.cause.Error())
+		return fmt.Sprintf(`kvega: invalid row data for key "%s": %s`, ire.key, ire.cause.Error())
 	}
 
-	return "invalid row data: " + ire.cause.Error()
+	return "kvega: invalid row data: " + ire.cause.Error()
 }
 
 // Unwrap implements error unwrapping for errors.Is/errors.As.
@@ -84,14 +84,14 @@ type EmbeddedDB struct {
 func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 	err := os.MkdirAll(filepath.Dir(path), 0o750)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create directories: %w", err)
+		return nil, fmt.Errorf("kvega: failed to create directories: %w", err)
 	}
 
 	// The caller should ensure the provided path is safe to open.
 	//gosec:disable G304
 	writer, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|os.O_SYNC, 0o600)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create writer: %w", err)
+		return nil, fmt.Errorf("kvega: failed to create writer: %w", err)
 	}
 
 	readers := make([]*os.File, runtime.GOMAXPROCS(0))
@@ -112,7 +112,7 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 				reader.Close()
 			}
 
-			return nil, fmt.Errorf("failed to create reader: %w", err)
+			return nil, fmt.Errorf("kvega: failed to create reader: %w", err)
 		}
 
 		readers[idx] = reader
@@ -160,12 +160,12 @@ func (edb *EmbeddedDB) Close() error {
 
 	err := edb.writer.Sync()
 	if err != nil {
-		return fmt.Errorf("failed to sync writer: %w", err)
+		return fmt.Errorf("kvega: failed to sync writer: %w", err)
 	}
 
 	err = edb.writer.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close writer: %w", err)
+		return fmt.Errorf("kvega: failed to close writer: %w", err)
 	}
 
 	for idx, reader := range edb.readers {
@@ -174,7 +174,7 @@ func (edb *EmbeddedDB) Close() error {
 		edb.rmus[idx].Unlock()
 
 		if err != nil {
-			return fmt.Errorf("failed to close reader: %w", err)
+			return fmt.Errorf("kvega: failed to close reader: %w", err)
 		}
 	}
 
@@ -243,7 +243,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 	_, err := file.Seek(offset, io.SeekStart)
 	if err != nil {
-		return nil, fmt.Errorf("failed to seek reader: %w", err)
+		return nil, fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
 	reader := csv.NewReader(file)
@@ -347,12 +347,12 @@ func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
 	// Doesn't actually seek, retrieves current offset.
 	offset, err := edb.writer.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return fmt.Errorf("failed to seek writer: %w", err)
+		return fmt.Errorf("kvega: failed to seek writer: %w", err)
 	}
 
 	_, err = edb.writer.Write(row)
 	if err != nil {
-		return fmt.Errorf("failed to write row: %w", err)
+		return fmt.Errorf("kvega: failed to write row: %w", err)
 	}
 
 	edb.imu.Lock()
@@ -372,7 +372,7 @@ func (edb *EmbeddedDB) readRow(reader *csv.Reader) (row, error) {
 	}
 
 	if err != nil {
-		return row{}, fmt.Errorf("failed to read row: %w", err)
+		return row{}, fmt.Errorf("kvega: failed to read row: %w", err)
 	}
 
 	if len(columns) < 2 {
@@ -418,7 +418,7 @@ func (edb *EmbeddedDB) buildIndex() error {
 
 	_, err := file.Seek(0, io.SeekStart)
 	if err != nil {
-		return fmt.Errorf("failed to seek reader: %w", err)
+		return fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
 	index := make(map[string]int64)

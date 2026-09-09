@@ -9,14 +9,14 @@ import (
 
 var (
 	// ErrInvalidLocationScheme is returned by OpenDB when an invalid scheme is given.
-	ErrInvalidLocationScheme = errors.New("invalid location scheme")
+	ErrInvalidLocationScheme = errors.New("kvega: invalid location scheme")
 	// ErrInvalidEmbeddedDBLocation is returned by OpenDB when the location is missing
 	// the path or a host is given.
-	ErrInvalidEmbeddedDBLocation = errors.New("invalid embedded db location")
+	ErrInvalidEmbeddedDBLocation = errors.New("kvega: invalid embedded db location")
 	// ErrClosed is returned when a database has been closed.
-	ErrClosed = errors.New("database closed")
+	ErrClosed = errors.New("kvega: database closed")
 	// ErrNotFound is returned when a key could not be found.
-	ErrNotFound = errors.New("key not found")
+	ErrNotFound = errors.New("kvega: key not found")
 )
 
 // A DB provides access to a database backend.
@@ -59,7 +59,7 @@ type DB interface {
 func OpenDB(location string) (DB, error) {
 	url, err := url.Parse(location)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse location: %w", err)
+		return nil, fmt.Errorf("kvega: failed to parse location: %w", err)
 	}
 
 	switch url.Scheme {
