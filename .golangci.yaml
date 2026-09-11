@@ -89,6 +89,13 @@ linters:
         - "identical"
         - "unused"
         - "unexported"
+    ireturn:
+      allow:
+        - "empty"
+        - "anon"
+        - "error"
+        - "generic"
+        - "stdlib"
     nakedret:
       max-func-lines: 0
     paralleltest:
