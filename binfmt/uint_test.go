@@ -3,62 +3,12 @@ package binfmt
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-type errReadWriter struct {
-	buf      *bytes.Buffer
-	n        int
-	errAfter int
-	err      error
-}
-
-func (erw *errReadWriter) Read(p []byte) (int, error) {
-	if erw.buf == nil {
-		erw.buf = bytes.NewBuffer(nil)
-	}
-
-	maxRead := min(len(p), erw.errAfter-erw.n)
-
-	n, err := erw.buf.Read(p[:maxRead])
-	if err != nil {
-		return n, fmt.Errorf("binfmt: failed to read: %w", err)
-	}
-
-	erw.n += n
-
-	if erw.n >= erw.errAfter {
-		return n, erw.err
-	}
-
-	return n, nil
-}
-
-func (erw *errReadWriter) Write(p []byte) (int, error) {
-	if erw.buf == nil {
-		erw.buf = bytes.NewBuffer(nil)
-	}
-
-	maxWrite := min(len(p), erw.errAfter-erw.n)
-
-	n, err := erw.buf.Write(p[:maxWrite])
-	if err != nil {
-		return n, fmt.Errorf("binfmt: failed to write: %w", err)
-	}
-
-	erw.n += n
-
-	if erw.n >= erw.errAfter {
-		return n, erw.err
-	}
-
-	return n, nil
-}
 
 func TestWriteUint(t *testing.T) {
 	t.Parallel()
@@ -212,7 +162,7 @@ func TestReadUint(t *testing.T) {
 		assert.ErrorIs(t, err, ErrReadUintOverflow)
 	})
 
-	t.Run("reads small uint encoded as one byte", func(t *testing.T) {
+	t.Run("reads small uint encoded in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -225,7 +175,7 @@ func TestReadUint(t *testing.T) {
 		assert.Equal(t, uint(127), value)
 	})
 
-	t.Run("reads medium uint encoded as three bytes", func(t *testing.T) {
+	t.Run("reads medium uint encoded in three bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -242,7 +192,7 @@ func TestReadUint(t *testing.T) {
 		assert.Equal(t, uint(0xbbbb), value)
 	})
 
-	t.Run("reads large uint encoded as nine bytes", func(t *testing.T) {
+	t.Run("reads large uint encoded in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -265,7 +215,7 @@ func TestReadUint(t *testing.T) {
 		assert.Equal(t, uint64(0xbbb_bbbb_bbbb_bbbb), value)
 	})
 
-	t.Run("reads marg uint encoded as 10 bytes", func(t *testing.T) {
+	t.Run("reads marg uint encoded in 10 bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer

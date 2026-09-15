@@ -103,22 +103,22 @@ func ReadUint[T constraints.Unsigned](reader *bufio.Reader) (T, int, error) {
 	}
 
 	var (
-		out   uint64
+		value uint64
 		shift uint
 	)
 
 	// Loop the bytes in little-endian order since we don't know how
 	// many shifts are required to build the original value.
-	for _, value := range slices.Backward(bytes) {
-		out |= uint64(setContinuation(value, false)) << shift
+	for _, byt := range slices.Backward(bytes) {
+		value |= uint64(setContinuation(byt, false)) << shift
 		shift += 7
 	}
 
-	if out > uint64(T(0)-1) {
+	if value > uint64(T(0)-1) {
 		return 0, len(bytes), ErrReadUintOverflow
 	}
 
-	return T(out), len(bytes), nil
+	return T(value), len(bytes), nil
 }
 
 func setContinuation(value byte, set bool) byte {
