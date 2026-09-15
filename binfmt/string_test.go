@@ -15,29 +15,8 @@ func TestWriteString(t *testing.T) {
 	t.Run("returns ErrWriteStringInvalid when string is not valid UTF-8", func(t *testing.T) {
 		t.Parallel()
 
-		n, err := WriteString(nil, string([]byte{0xff, 0xfe, 0xfd}))
-		assert.Zero(t, n)
+		err := WriteString(nil, string([]byte{0xff, 0xfe, 0xfd}))
 		assert.ErrorIs(t, err, ErrWriteStringInvalid)
-	})
-
-	t.Run("returns error from WriteInt", func(t *testing.T) {
-		t.Parallel()
-
-		// Error after the one byte was written for the length.
-		n, err := WriteString(&errReadWriter{err: io.ErrClosedPipe, errAfter: 1}, "test")
-		assert.Equal(t, 1, n)
-		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "write int")
-	})
-
-	t.Run("returns error from copying value", func(t *testing.T) {
-		t.Parallel()
-
-		// Error after the length was written and the beginning of the value is being written.
-		n, err := WriteString(&errReadWriter{err: io.ErrClosedPipe, errAfter: 3}, "test")
-		assert.Equal(t, 3, n)
-		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "write string")
 	})
 
 	t.Run("writes length and value to writer", func(t *testing.T) {
@@ -47,10 +26,10 @@ func TestWriteString(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		n, err := WriteString(&buf, value)
+		err := WriteString(&buf, value)
 		assert.NoError(t, err)
 
-		assert.Equal(t, len(value)+1, n)
+		assert.Equal(t, len(value)+1, buf.Len())
 		assert.Equal(t, byte(0b0100_0000), buf.Bytes()[0])
 		assert.Equal(t, value, string(buf.Bytes()[1:]))
 	})
@@ -73,10 +52,7 @@ func TestReadString(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, 5)
-		assert.NoError(t, err)
-
+		WriteInt(&buf, 5)
 		buf.Write(make([]byte, 2))
 
 		value, n, err := ReadString(bufio.NewReader(&buf))
@@ -90,10 +66,7 @@ func TestReadString(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, 5)
-		assert.NoError(t, err)
-
+		WriteInt(&buf, 5)
 		buf.Write(make([]byte, 5))
 
 		value, n, err := ReadString(bufio.NewReader(&errReadWriter{
@@ -114,10 +87,7 @@ func TestReadString(t *testing.T) {
 		value := []byte{0xff, 0xfe, 0xfd}
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, len(value))
-		assert.NoError(t, err)
-
+		WriteInt(&buf, len(value))
 		buf.Write(value)
 
 		actual, n, err := ReadString(bufio.NewReader(&buf))
@@ -132,10 +102,7 @@ func TestReadString(t *testing.T) {
 		value := "Cześć, こんにちは, 你好"
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, len(value))
-		assert.NoError(t, err)
-
+		WriteInt(&buf, len(value))
 		buf.WriteString(value)
 
 		actual, n, err := ReadString(bufio.NewReader(&buf))

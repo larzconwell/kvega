@@ -2,9 +2,9 @@ package binfmt
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"unsafe"
 
 	"golang.org/x/exp/constraints"
@@ -24,19 +24,13 @@ var (
 // as an unsigned value by evenly spreading positive and negative numbers across the
 // unsigned value range. Negative numbers become double their absolute value minus
 // one. Positive numbers meanwhile become double their absolute value.
-func WriteInt[T constraints.Signed](writer io.Writer, value T) (int, error) {
+func WriteInt[T constraints.Signed](writer *bytes.Buffer, value T) {
 	bitSize := unsafe.Sizeof(value) * 8
 
 	// Use uint64 since we have no clean way in Go to get an unsigned
 	// version of T without adding more type parameters.
 	uValue := (uint64(value) << 1) ^ uint64(value>>(bitSize-1))
-
-	n, err := WriteUint(writer, uValue)
-	if err != nil {
-		err = fmt.Errorf("binfmt: failed to write int: %w", errors.Unwrap(err))
-	}
-
-	return n, err
+	WriteUint(writer, uValue)
 }
 
 // ReadInt reads a big-endian variable length encoded uint that contains a

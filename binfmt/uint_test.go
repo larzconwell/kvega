@@ -13,35 +13,21 @@ import (
 func TestWriteUint(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns writer error", func(t *testing.T) {
-		t.Parallel()
-
-		n, err := WriteUint(&errReadWriter{err: io.ErrClosedPipe}, uint(5))
-		assert.Zero(t, n)
-		assert.ErrorIs(t, err, io.ErrClosedPipe)
-	})
-
 	t.Run("writes small uint in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteUint(&buf, uint(127))
 
-		n, err := WriteUint(&buf, uint(127))
-		assert.NoError(t, err)
-
-		assert.Equal(t, 1, n)
-		assert.Equal(t, byte(0b0111_1111), buf.Bytes()[0])
+		assert.Equal(t, []byte{0b0111_1111}, buf.Bytes())
 	})
 
 	t.Run("writes medium uint in three bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteUint(&buf, uint(0xbbbb))
 
-		n, err := WriteUint(&buf, uint(0xbbbb))
-		assert.NoError(t, err)
-
-		assert.Equal(t, 3, n)
 		assert.Equal(t, []byte{
 			0b1000_0010,
 			0b1111_0111,
@@ -53,11 +39,8 @@ func TestWriteUint(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteUint(&buf, uint64(0xbbb_bbbb_bbbb_bbbb))
 
-		n, err := WriteUint(&buf, uint64(0xbbb_bbbb_bbbb_bbbb))
-		assert.NoError(t, err)
-
-		assert.Equal(t, 9, n)
 		assert.Equal(t, []byte{
 			0b1000_1011,
 			0b1101_1101,
@@ -75,11 +58,8 @@ func TestWriteUint(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteUint(&buf, uint64(math.MaxUint64))
 
-		n, err := WriteUint(&buf, uint64(math.MaxUint64))
-		assert.NoError(t, err)
-
-		assert.Equal(t, 10, n)
 		assert.Equal(t, []byte{
 			0b1000_0001,
 			0xff,

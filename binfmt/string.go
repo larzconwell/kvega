@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -20,24 +19,15 @@ var (
 // WriteString writes the length of the string in bytes to the writer
 // using WriteUint and then the bytes of the string are written.
 // ErrWriteStringInvalid is returned when value is not valid UTF-8.
-func WriteString(writer io.Writer, value string) (int, error) {
+func WriteString(writer *bytes.Buffer, value string) error {
 	if !utf8.ValidString(value) {
-		return 0, ErrWriteStringInvalid
+		return ErrWriteStringInvalid
 	}
 
-	lenn, err := WriteInt(writer, int64(len(value)))
-	if err != nil {
-		return lenn, fmt.Errorf("binfmt: failed to write string length: %w", err)
-	}
+	WriteInt(writer, int64(len(value)))
+	writer.WriteString(value)
 
-	reader := strings.NewReader(value)
-
-	n, err := io.Copy(writer, reader)
-	if err != nil {
-		return lenn + int(n), fmt.Errorf("binfmt: failed to write string: %w", err)
-	}
-
-	return lenn + int(n), nil
+	return nil
 }
 
 // ReadString reads a string from reader, first by reading the length in

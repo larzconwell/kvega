@@ -12,26 +12,6 @@ import (
 func TestWriteBinary(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from WriteInt", func(t *testing.T) {
-		t.Parallel()
-
-		// Error after the one byte was written for the length.
-		n, err := WriteBinary(&errReadWriter{err: io.ErrClosedPipe, errAfter: 1}, []byte("test"))
-		assert.Equal(t, 1, n)
-		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "write int")
-	})
-
-	t.Run("returns error from copying value", func(t *testing.T) {
-		t.Parallel()
-
-		// Error after the length was written and the beginning of the value is being written.
-		n, err := WriteBinary(&errReadWriter{err: io.ErrClosedPipe, errAfter: 3}, []byte("test"))
-		assert.Equal(t, 3, n)
-		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "write binary")
-	})
-
 	t.Run("writes length and value to writer", func(t *testing.T) {
 		t.Parallel()
 
@@ -41,11 +21,9 @@ func TestWriteBinary(t *testing.T) {
 		}
 
 		var buf bytes.Buffer
+		WriteBinary(&buf, value)
 
-		n, err := WriteBinary(&buf, value)
-		assert.NoError(t, err)
-
-		assert.Equal(t, len(value)+2, n)
+		assert.Equal(t, len(value)+2, buf.Len())
 		assert.Equal(t, []byte{
 			0b1000_0010,
 			0,
@@ -71,10 +49,7 @@ func TestReadBinary(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, 5)
-		assert.NoError(t, err)
-
+		WriteInt(&buf, 5)
 		buf.Write(make([]byte, 2))
 
 		value, n, err := ReadBinary(bufio.NewReader(&buf))
@@ -88,10 +63,7 @@ func TestReadBinary(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, 5)
-		assert.NoError(t, err)
-
+		WriteInt(&buf, 5)
 		buf.Write(make([]byte, 5))
 
 		value, n, err := ReadBinary(bufio.NewReader(&errReadWriter{
@@ -115,10 +87,7 @@ func TestReadBinary(t *testing.T) {
 		}
 
 		var buf bytes.Buffer
-
-		_, err := WriteInt(&buf, len(value))
-		assert.NoError(t, err)
-
+		WriteInt(&buf, len(value))
 		buf.Write(value)
 
 		actual, n, err := ReadBinary(bufio.NewReader(&buf))

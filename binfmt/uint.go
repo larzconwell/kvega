@@ -2,6 +2,7 @@ package binfmt
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -37,7 +38,7 @@ var (
 // [___10000] [10001010] - Binary representation of value.
 // [__100001] [_0001010] - Spliting value into 7 bit chunks.
 // [10100001] [00001010] - Adding continuation bits to the 7 bit chunks.
-func WriteUint[T constraints.Unsigned](writer io.Writer, value T) (int, error) {
+func WriteUint[T constraints.Unsigned](writer *bytes.Buffer, value T) {
 	// Determine number of bytes required to store encoded value.
 	msbidx := bits.Len64(uint64(value))
 	size := msbidx / byteSize
@@ -62,13 +63,7 @@ func WriteUint[T constraints.Unsigned](writer io.Writer, value T) (int, error) {
 	}
 
 	bytes[idx] = setContinuation(byte(value), !last)
-
-	n, err := writer.Write(bytes)
-	if err != nil {
-		return n, fmt.Errorf("binfmt: failed to write uint: %w", err)
-	}
-
-	return n, nil
+	writer.Write(bytes)
 }
 
 // ReadUint reads a big-endian variable length encoded uint from reader. It will read

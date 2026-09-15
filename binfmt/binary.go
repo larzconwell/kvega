@@ -11,20 +11,9 @@ import (
 // WriteBinary writes the length of the slice to the writer using
 // WriteUint and then the slice itself is written. The slice may
 // contain any byte including NUL.
-func WriteBinary(writer io.Writer, value []byte) (int, error) {
-	lenn, err := WriteInt(writer, int64(len(value)))
-	if err != nil {
-		return lenn, fmt.Errorf("binfmt: failed to write binary length: %w", err)
-	}
-
-	reader := bytes.NewReader(value)
-
-	n, err := io.Copy(writer, reader)
-	if err != nil {
-		return lenn + int(n), fmt.Errorf("binfmt: failed to write binary: %w", err)
-	}
-
-	return lenn + int(n), nil
+func WriteBinary(writer *bytes.Buffer, value []byte) {
+	WriteInt(writer, int64(len(value)))
+	writer.Write(value)
 }
 
 // ReadBinary reads a slice from reader, first by reading the length

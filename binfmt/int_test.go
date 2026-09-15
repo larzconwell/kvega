@@ -13,47 +13,30 @@ import (
 func TestWriteInt(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns writer error", func(t *testing.T) {
-		t.Parallel()
-
-		n, err := WriteInt(&errReadWriter{err: io.ErrClosedPipe}, 5)
-		assert.Zero(t, n)
-		assert.ErrorIs(t, err, io.ErrClosedPipe)
-	})
-
 	t.Run("writes small positive zigzag encoded int in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, 50)
 
-		n, err := WriteInt(&buf, 50)
-		assert.NoError(t, err)
-
-		assert.Equal(t, 1, n)
-		assert.Equal(t, byte(0b0110_0100), buf.Bytes()[0])
+		assert.Equal(t, []byte{0b0110_0100}, buf.Bytes())
 	})
 
 	t.Run("writes small negative zigzag encoded int in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, -50)
 
-		n, err := WriteInt(&buf, -50)
-		assert.NoError(t, err)
-
-		assert.Equal(t, 1, n)
-		assert.Equal(t, byte(0b0110_0011), buf.Bytes()[0])
+		assert.Equal(t, []byte{0b0110_0011}, buf.Bytes())
 	})
 
 	t.Run("writes medium positive zigzag encoded int in three bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, 48_059)
 
-		n, err := WriteInt(&buf, 48_059)
-		assert.NoError(t, err)
-
-		assert.Equal(t, 3, n)
 		assert.Equal(t, []byte{
 			0b1000_0101,
 			0b1110_1110,
@@ -65,11 +48,8 @@ func TestWriteInt(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, -48_059)
 
-		n, err := WriteInt(&buf, -48_059)
-		assert.NoError(t, err)
-
-		assert.Equal(t, 3, n)
 		assert.Equal(t, []byte{
 			0b1000_0101,
 			0b1110_1110,
@@ -81,11 +61,8 @@ func TestWriteInt(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, int64(845_475_770_045_021_115))
 
-		n, err := WriteInt(&buf, int64(845_475_770_045_021_115))
-		assert.NoError(t, err)
-
-		assert.Equal(t, 9, n)
 		assert.Equal(t, []byte{
 			0b1001_0111,
 			0b1011_1011,
@@ -103,11 +80,8 @@ func TestWriteInt(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, int64(-845_475_770_045_021_115))
 
-		n, err := WriteInt(&buf, int64(-845_475_770_045_021_115))
-		assert.NoError(t, err)
-
-		assert.Equal(t, 9, n)
 		assert.Equal(t, []byte{
 			0b10010111,
 			0b10111011,
@@ -125,11 +99,8 @@ func TestWriteInt(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, math.MinInt64)
 
-		n, err := WriteInt(&buf, math.MinInt64)
-		assert.NoError(t, err)
-
-		assert.Equal(t, 10, n)
 		assert.Equal(t, []byte{
 			0b10000001,
 			0xff,
@@ -148,11 +119,8 @@ func TestWriteInt(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
+		WriteInt(&buf, math.MaxInt64)
 
-		n, err := WriteInt(&buf, math.MaxInt64)
-		assert.NoError(t, err)
-
-		assert.Equal(t, 10, n)
 		assert.Equal(t, []byte{
 			0b10000001,
 			0xff,
