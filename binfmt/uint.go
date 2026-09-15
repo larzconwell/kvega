@@ -87,7 +87,7 @@ func ReadUint[T constraints.Unsigned](reader *bufio.Reader) (T, int, error) {
 		}
 
 		if err != nil {
-			return 0, len(bytes), fmt.Errorf("binfmt: failed to read uint byte: %w", err)
+			return 0, len(bytes), fmt.Errorf("binfmt: failed to read uint: %w", err)
 		}
 
 		bytes = append(bytes, value)

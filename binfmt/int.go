@@ -52,7 +52,7 @@ func ReadInt[T constraints.Signed](reader *bufio.Reader) (T, int, error) {
 	}
 
 	if err != nil {
-		return 0, n, fmt.Errorf("binfmt: failed to read int byte: %w", errors.Unwrap(err))
+		return 0, n, fmt.Errorf("binfmt: failed to read int: %w", errors.Unwrap(err))
 	}
 
 	// This theoretical overflow is fine, the conversion will lead

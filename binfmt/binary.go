@@ -14,7 +14,7 @@ import (
 func WriteBinary(writer io.Writer, value []byte) (int, error) {
 	lenn, err := WriteInt(writer, int64(len(value)))
 	if err != nil {
-		return lenn, err
+		return lenn, fmt.Errorf("binfmt: failed to write binary length: %w", err)
 	}
 
 	reader := bytes.NewReader(value)
@@ -32,7 +32,7 @@ func WriteBinary(writer io.Writer, value []byte) (int, error) {
 func ReadBinary(reader *bufio.Reader) ([]byte, int, error) {
 	length, lenn, err := ReadInt[int64](reader)
 	if err != nil {
-		return nil, lenn, err
+		return nil, lenn, fmt.Errorf("binfmt: failed to read binary length: %w", err)
 	}
 
 	var buf bytes.Buffer
