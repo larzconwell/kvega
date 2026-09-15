@@ -12,8 +12,7 @@ import (
 // WriteUint and then the slice itself is written. The slice may
 // contain any byte including NUL.
 func WriteBinary(writer io.Writer, value []byte) (int, error) {
-	// TODO: Write an int instead of a uint to ease reading, sizes won't really exceed int64 anyway.
-	lenn, err := WriteUint(writer, uint64(len(value)))
+	lenn, err := WriteInt(writer, int64(len(value)))
 	if err != nil {
 		return lenn, err
 	}
@@ -31,18 +30,14 @@ func WriteBinary(writer io.Writer, value []byte) (int, error) {
 // ReadBinary reads a slice from reader, first by reading the length
 // using ReadUint, followed by reading the actual bytes themselves.
 func ReadBinary(reader *bufio.Reader) ([]byte, int, error) {
-	// TODO: Read an int instead of a uint to avoid unsafe conversion in io.CopyN.
-	length, lenn, err := ReadUint[uint64](reader)
+	length, lenn, err := ReadInt[int64](reader)
 	if err != nil {
 		return nil, lenn, err
 	}
 
 	var buf bytes.Buffer
 
-	// If length overflows int64 it'll wrap around to negative, and io.CopyN will
-	// return 0, io.EOF. For now this will do until int reading is added.
-	//gosec:disable G115
-	n, err := io.CopyN(&buf, reader, int64(length))
+	n, err := io.CopyN(&buf, reader, length)
 	if errors.Is(err, io.EOF) {
 		err = io.ErrUnexpectedEOF
 	}

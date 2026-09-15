@@ -12,14 +12,14 @@ import (
 func TestWriteBinary(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from WriteUint", func(t *testing.T) {
+	t.Run("returns error from WriteInt", func(t *testing.T) {
 		t.Parallel()
 
 		// Error after the one byte was written for the length.
 		n, err := WriteBinary(&errReadWriter{err: io.ErrClosedPipe, errAfter: 1}, []byte("test"))
 		assert.Equal(t, 1, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "write uint")
+		assert.ErrorContains(t, err, "write int")
 	})
 
 	t.Run("returns error from copying value", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestWriteBinary(t *testing.T) {
 
 		assert.Equal(t, len(value)+2, n)
 		assert.Equal(t, []byte{
-			0b1000_0001,
+			0b1000_0010,
 			0,
 		}, buf.Bytes()[:2])
 		assert.Equal(t, value, buf.Bytes()[2:])
@@ -57,14 +57,14 @@ func TestWriteBinary(t *testing.T) {
 func TestReadBinary(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from ReadUint", func(t *testing.T) {
+	t.Run("returns error from ReadInt", func(t *testing.T) {
 		t.Parallel()
 
 		value, n, err := ReadBinary(bufio.NewReader(&errReadWriter{err: io.ErrClosedPipe}))
 		assert.Empty(t, value)
 		assert.Zero(t, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "read uint")
+		assert.ErrorContains(t, err, "read int")
 	})
 
 	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF before the value has been completely read", func(t *testing.T) {
@@ -72,7 +72,7 @@ func TestReadBinary(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		_, err := WriteUint(&buf, uint(5))
+		_, err := WriteInt(&buf, 5)
 		assert.NoError(t, err)
 
 		buf.Write(make([]byte, 2))
@@ -89,7 +89,7 @@ func TestReadBinary(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		_, err := WriteUint(&buf, uint(5))
+		_, err := WriteInt(&buf, 5)
 		assert.NoError(t, err)
 
 		buf.Write(make([]byte, 5))
@@ -116,7 +116,7 @@ func TestReadBinary(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		_, err := WriteUint(&buf, uint64(len(value)))
+		_, err := WriteInt(&buf, len(value))
 		assert.NoError(t, err)
 
 		buf.Write(value)
