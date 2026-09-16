@@ -1,6 +1,7 @@
 package binfmt
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 )
@@ -20,4 +21,16 @@ func WriteDeleteRow(writer *bytes.Buffer, key string) error {
 	}
 
 	return nil
+}
+
+// ReadDeleteRow reads a delete row from reader, and expects that the row
+// identifier byte has already been read to determine the kind of row
+// to read.
+func ReadDeleteRow(reader *bufio.Reader) (string, int, error) {
+	key, keyn, err := ReadString(reader)
+	if err != nil {
+		return "", keyn, fmt.Errorf("binfmt: failed to read key: %w", err)
+	}
+
+	return key, keyn, nil
 }

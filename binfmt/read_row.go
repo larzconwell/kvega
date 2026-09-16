@@ -9,6 +9,8 @@ import (
 var (
 	// ErrRowIdentInvalid is returned when an invalid row identifier has been read.
 	ErrRowIdentInvalid = errors.New("binfmt: row has invalid row identifier")
+	// ErrRowValueIdentInvalid is returned when a row is read that has an invalid type identifier.
+	ErrRowValueIdentInvalid = errors.New("binfmt: row has invalid value identifier")
 )
 
 // ReadRowIdent reads a row identifier from the reader and returns it if it's
