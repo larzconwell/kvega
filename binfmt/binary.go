@@ -8,6 +8,11 @@ import (
 	"io"
 )
 
+const (
+	// BinaryIdent is the type identifier for a binary value.
+	BinaryIdent = 'B'
+)
+
 // WriteBinary writes the length of the slice to the writer using
 // WriteUint and then the slice itself is written. The slice may
 // contain any byte including NUL.

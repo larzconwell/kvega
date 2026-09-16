@@ -31,7 +31,7 @@ func TestWriteDeleteRow(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1+1+15, buf.Len())
-		assert.Equal(t, byte('D'), buf.Bytes()[0])
+		assert.Equal(t, byte(DeleteRowIdent), buf.Bytes()[0])
 		assert.Equal(t, byte(0b0001_1110), buf.Bytes()[1])
 		assert.Equal(t, []byte(key), buf.Bytes()[2:17])
 	})

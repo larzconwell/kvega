@@ -5,9 +5,14 @@ import (
 	"fmt"
 )
 
+const (
+	// DeleteRowIdent is the type identifier for a delete row.
+	DeleteRowIdent = 'D'
+)
+
 // WriteDeleteRow writes a delete row for the given key.
 func WriteDeleteRow(writer *bytes.Buffer, key string) error {
-	writer.WriteByte('D')
+	writer.WriteByte(DeleteRowIdent)
 
 	err := WriteString(writer, key)
 	if err != nil {
