@@ -16,7 +16,7 @@ func TestWriteDeleteRow(t *testing.T) {
 		var buf bytes.Buffer
 
 		err := WriteDeleteRow(&buf, string([]byte{0xff, 0xfe, 0xfd}))
-		assert.ErrorIs(t, err, ErrWriteStringInvalid)
+		assert.ErrorIs(t, err, ErrStringInvalid)
 		assert.ErrorContains(t, err, "write key")
 	})
 

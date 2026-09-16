@@ -16,7 +16,7 @@ func TestWriteSetRow(t *testing.T) {
 		var buf bytes.Buffer
 
 		err := WriteSetRow(&buf, string([]byte{0xff, 0xfe, 0xfd}), []byte("value"))
-		assert.ErrorIs(t, err, ErrWriteStringInvalid)
+		assert.ErrorIs(t, err, ErrStringInvalid)
 		assert.ErrorContains(t, err, "write key")
 	})
 

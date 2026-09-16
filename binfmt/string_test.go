@@ -12,11 +12,11 @@ import (
 func TestWriteString(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns ErrWriteStringInvalid when string is not valid UTF-8", func(t *testing.T) {
+	t.Run("returns ErrStringInvalid when string is not valid UTF-8", func(t *testing.T) {
 		t.Parallel()
 
 		err := WriteString(nil, string([]byte{0xff, 0xfe, 0xfd}))
-		assert.ErrorIs(t, err, ErrWriteStringInvalid)
+		assert.ErrorIs(t, err, ErrStringInvalid)
 	})
 
 	t.Run("writes length and value to writer", func(t *testing.T) {
@@ -81,7 +81,7 @@ func TestReadString(t *testing.T) {
 		assert.ErrorContains(t, err, "read string")
 	})
 
-	t.Run("returns ErrReadStringInvalid when read string is not valid UTF-8", func(t *testing.T) {
+	t.Run("returns ErrStringInvalid when read string is not valid UTF-8", func(t *testing.T) {
 		t.Parallel()
 
 		value := []byte{0xff, 0xfe, 0xfd}
@@ -93,7 +93,7 @@ func TestReadString(t *testing.T) {
 		actual, n, err := ReadString(bufio.NewReader(&buf))
 		assert.Empty(t, actual)
 		assert.Equal(t, len(value)+1, n)
-		assert.ErrorIs(t, err, ErrReadStringInvalid)
+		assert.ErrorIs(t, err, ErrStringInvalid)
 	})
 
 	t.Run("returns the read value", func(t *testing.T) {

@@ -10,10 +10,8 @@ import (
 )
 
 var (
-	// ErrWriteStringInvalid is returned when a string contains invalid UTF-8 runes.
-	ErrWriteStringInvalid = errors.New("binfmt: string contains invalid data")
-	// ErrReadStringInvalid is returned when a read string contains invalid UTF-8 runes.
-	ErrReadStringInvalid = errors.New("binfmt: read string contains invalid data")
+	// ErrStringInvalid is returned when a string contains invalid UTF-8 runes.
+	ErrStringInvalid = errors.New("binfmt: string contains invalid data")
 )
 
 // WriteString writes the length of the string in bytes to the writer
@@ -21,7 +19,7 @@ var (
 // ErrWriteStringInvalid is returned when value is not valid UTF-8.
 func WriteString(writer *bytes.Buffer, value string) error {
 	if !utf8.ValidString(value) {
-		return ErrWriteStringInvalid
+		return ErrStringInvalid
 	}
 
 	WriteInt(writer, int64(len(value)))
@@ -53,7 +51,7 @@ func ReadString(reader *bufio.Reader) (string, int, error) {
 
 	bytes := buf.Bytes()
 	if !utf8.Valid(bytes) {
-		return "", lenn + int(n), ErrReadStringInvalid
+		return "", lenn + int(n), ErrStringInvalid
 	}
 
 	return string(bytes), lenn + int(n), nil
