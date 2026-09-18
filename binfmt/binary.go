@@ -29,6 +29,10 @@ func ReadBinary(reader *bufio.Reader) ([]byte, int, error) {
 		return nil, lenn, fmt.Errorf("binfmt: failed to read binary length: %w", err)
 	}
 
+	if length == 0 {
+		return make([]byte, 0), lenn, nil
+	}
+
 	var buf bytes.Buffer
 
 	n, err := io.CopyN(&buf, reader, length)

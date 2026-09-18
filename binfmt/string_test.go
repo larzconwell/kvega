@@ -19,6 +19,17 @@ func TestWriteString(t *testing.T) {
 		assert.ErrorIs(t, err, ErrStringInvalid)
 	})
 
+	t.Run("writes empty string to writer", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+
+		err := WriteString(&buf, "")
+		assert.NoError(t, err)
+
+		assert.Equal(t, []byte{0}, buf.Bytes())
+	})
+
 	t.Run("writes length and value to writer", func(t *testing.T) {
 		t.Parallel()
 
@@ -94,6 +105,19 @@ func TestReadString(t *testing.T) {
 		assert.Empty(t, actual)
 		assert.Equal(t, len(value)+1, n)
 		assert.ErrorIs(t, err, ErrStringInvalid)
+	})
+
+	t.Run("returns empty string from reader", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		WriteInt(&buf, 0)
+
+		actual, n, err := ReadString(bufio.NewReader(&buf))
+		assert.NoError(t, err)
+
+		assert.Equal(t, 1, n)
+		assert.Equal(t, "", actual)
 	})
 
 	t.Run("returns the read value", func(t *testing.T) {

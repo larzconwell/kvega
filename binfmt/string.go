@@ -38,6 +38,10 @@ func ReadString(reader *bufio.Reader) (string, int, error) {
 		return "", lenn, fmt.Errorf("binfmt: failed to read string length: %w", err)
 	}
 
+	if length == 0 {
+		return "", lenn, nil
+	}
+
 	var buf bytes.Buffer
 
 	n, err := io.CopyN(&buf, reader, length)

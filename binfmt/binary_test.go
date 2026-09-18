@@ -12,6 +12,15 @@ import (
 func TestWriteBinary(t *testing.T) {
 	t.Parallel()
 
+	t.Run("writes empty binary to writer", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		WriteBinary(&buf, nil)
+
+		assert.Equal(t, []byte{0}, buf.Bytes())
+	})
+
 	t.Run("writes length and value to writer", func(t *testing.T) {
 		t.Parallel()
 
@@ -76,6 +85,19 @@ func TestReadBinary(t *testing.T) {
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
 		assert.ErrorContains(t, err, "read binary")
+	})
+
+	t.Run("returns empty binary from reader", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		WriteInt(&buf, 0)
+
+		actual, n, err := ReadBinary(bufio.NewReader(&buf))
+		assert.NoError(t, err)
+
+		assert.Equal(t, 1, n)
+		assert.Equal(t, make([]byte, 0), actual)
 	})
 
 	t.Run("returns the read value", func(t *testing.T) {
