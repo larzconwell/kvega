@@ -1,8 +1,10 @@
 package kvega
 
 import (
+	"bufio"
 	"bytes"
 	crypto "crypto/rand"
+	"errors"
 	"io"
 	"math/rand/v2"
 	"os"
@@ -11,7 +13,9 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"unicode/utf8"
 
+	"github.com/larzconwell/kvega/binfmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -200,6 +204,10 @@ func FuzzEmbeddedDB(f *testing.F) {
 			return
 		}
 
+		if !utf8.ValidString(key) {
+			return
+		}
+
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
 
 		edb, err := OpenEmbeddedDB(path)
@@ -325,16 +333,17 @@ func TestOpenEmbeddedDB(t *testing.T) {
 			assert.NoError(t, file.Close())
 		}()
 
-		// Force error by omitting key and value columns.
-		_, err = file.WriteString("S\n")
+		// Force error by writing invalid row identifier.
+		_, err = file.WriteString("Z")
+		assert.NoError(t, err)
+
+		err = file.Sync()
 		assert.NoError(t, err)
 
 		edb, err := OpenEmbeddedDB(path)
 		assert.Nil(t, edb)
-
-		var ire *InvalidRowError
-		assert.ErrorAs(t, err, &ire)
-		assert.ErrorIs(t, ire.cause, ErrInvalidRowColumns)
+		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
+		assert.ErrorContains(t, err, "read row identifier")
 	})
 
 	t.Run("builds an index of keys to file offsets", func(t *testing.T) {
@@ -358,8 +367,8 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		assert.NoError(t, edb.Close())
 
 		assert.Equal(t, map[string]int64{
-			"key":  43,
-			"key2": 16,
+			"key":  30,
+			"key2": 12,
 		}, edb.index)
 	})
 
@@ -479,12 +488,20 @@ func TestEmbeddedDBSet(t *testing.T) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		var buf bytes.Buffer
-
-		_, err = io.Copy(&buf, file)
+		actualRows, err := readRows(edb, bufio.NewReader(file))
 		assert.NoError(t, err)
 
-		assert.Equal(t, "D,a2V5\nS,a2V5,dmFsdWU=\n", buf.String())
+		assert.Equal(t, []row{
+			{
+				ident: binfmt.DeleteRowIdent,
+				key:   "key",
+			},
+			{
+				ident: binfmt.SetRowIdent,
+				key:   "key",
+				value: new([]byte("value")),
+			},
+		}, actualRows)
 	})
 
 	t.Run("updates the index for the key", func(t *testing.T) {
@@ -502,7 +519,7 @@ func TestEmbeddedDBSet(t *testing.T) {
 		assert.NoError(t, edb.Delete("key"))
 		assert.NoError(t, edb.Set("key", []byte("value")))
 
-		assert.Equal(t, int64(7), edb.index["key"])
+		assert.Equal(t, int64(5), edb.index["key"])
 	})
 }
 
@@ -555,12 +572,20 @@ func TestEmbeddedDBDelete(t *testing.T) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		var buf bytes.Buffer
-
-		_, err = io.Copy(&buf, file)
+		actualRows, err := readRows(edb, bufio.NewReader(file))
 		assert.NoError(t, err)
 
-		assert.Equal(t, "S,a2V5,dmFsdWU=\nD,a2V5\n", buf.String())
+		assert.Equal(t, []row{
+			{
+				ident: binfmt.SetRowIdent,
+				key:   "key",
+				value: new([]byte("value")),
+			},
+			{
+				ident: binfmt.DeleteRowIdent,
+				key:   "key",
+			},
+		}, actualRows)
 	})
 
 	t.Run("updates the index for the key", func(t *testing.T) {
@@ -578,7 +603,7 @@ func TestEmbeddedDBDelete(t *testing.T) {
 		assert.NoError(t, edb.Set("key", []byte("value")))
 		assert.NoError(t, edb.Delete("key"))
 
-		assert.Equal(t, int64(16), edb.index["key"])
+		assert.Equal(t, int64(12), edb.index["key"])
 	})
 }
 
@@ -633,7 +658,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
 
-	t.Run("returns InvalidRowError(ErrInvalidRowType) if encountering a row with an invalid row type", func(t *testing.T) {
+	t.Run("returns error if encountering a row with invalid row identifier", func(t *testing.T) {
 		t.Parallel()
 
 		path := filepath.Join(t.ArtifactDir(), "db.kvega")
@@ -645,17 +670,26 @@ func TestEmbeddedDBGet(t *testing.T) {
 			assert.NoError(t, edb.Close())
 		}()
 
-		// Force error by using an invalid row type.
-		_, err = edb.writer.WriteString("X,a2V5\n")
+		// The caller should ensure the provided path is safe to open.
+		//gosec:disable G304
+		file, err := os.Create(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, file.Close())
+		}()
+
+		// Force error by writing invalid row identifier.
+		_, err = file.WriteString("Z")
+		assert.NoError(t, err)
+
+		err = file.Sync()
 		assert.NoError(t, err)
 
 		value, err := edb.Get("key")
 		assert.Nil(t, value)
-
-		var ire *InvalidRowError
-		assert.ErrorAs(t, err, &ire)
-		assert.ErrorIs(t, ire.cause, ErrInvalidRowType)
-		assert.Equal(t, "key", ire.key)
+		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
+		assert.ErrorContains(t, err, "read row identifier")
 	})
 
 	t.Run("reads row at index offset if found for key", func(t *testing.T) {
@@ -709,7 +743,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 	t.Run("reading set data", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("returns InvalidRowError(ErrInvalidRowColumns) if encountering a row with invalid number of columns", func(t *testing.T) {
+		t.Run("returns error if failed to read a set row completely", func(t *testing.T) {
 			t.Parallel()
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
@@ -721,90 +755,20 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
-			// Force error by omitting the , and subsequent value.
-			_, err = edb.writer.WriteString("S,a2V5\n")
+			// Force error by only writing row identifier and key.
+			var buf bytes.Buffer
+			buf.WriteByte(binfmt.SetRowIdent)
+
+			err = binfmt.WriteString(&buf, "key")
+			assert.NoError(t, err)
+
+			_, err = edb.writer.Write(buf.Bytes())
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
 			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumns)
-			assert.Equal(t, "key", ire.key)
-		})
-
-		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with an empty key column", func(t *testing.T) {
-			t.Parallel()
-
-			path := filepath.Join(t.ArtifactDir(), "db.kvega")
-
-			edb, err := OpenEmbeddedDB(path)
-			assert.NoError(t, err)
-
-			defer func() {
-				assert.NoError(t, edb.Close())
-			}()
-
-			// Force error by omitting the key column.
-			_, err = edb.writer.WriteString("S,,dmFsdWU=\n")
-			assert.NoError(t, err)
-
-			value, err := edb.Get("key")
-			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
-		})
-
-		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a key that's not encoded as expected", func(t *testing.T) {
-			t.Parallel()
-
-			path := filepath.Join(t.ArtifactDir(), "db.kvega")
-
-			edb, err := OpenEmbeddedDB(path)
-			assert.NoError(t, err)
-
-			defer func() {
-				assert.NoError(t, edb.Close())
-			}()
-
-			// Force error by using invalid base64 in key column.
-			_, err = edb.writer.WriteString("S,****,dmFsdWU=\n")
-			assert.NoError(t, err)
-
-			value, err := edb.Get("key")
-			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
-		})
-
-		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a value that's not encoded as expected", func(t *testing.T) {
-			t.Parallel()
-
-			path := filepath.Join(t.ArtifactDir(), "db.kvega")
-
-			edb, err := OpenEmbeddedDB(path)
-			assert.NoError(t, err)
-
-			defer func() {
-				assert.NoError(t, edb.Close())
-			}()
-
-			// Force error by using invalid base64 in value column.
-			_, err = edb.writer.WriteString("S,a2V5,****\n")
-			assert.NoError(t, err)
-
-			value, err := edb.Get("key")
-			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
-			assert.Equal(t, "key", ire.key)
+			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+			assert.ErrorContains(t, err, "read set row")
 		})
 
 		t.Run("returns the value stored in the row for the key", func(t *testing.T) {
@@ -857,7 +821,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 	t.Run("reading delete data", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("returns InvalidRowError(ErrInvalidRowColumns) if encountering a row with invalid number of columns", func(t *testing.T) {
+		t.Run("returns error if failed to read a delete row completely", func(t *testing.T) {
 			t.Parallel()
 
 			path := filepath.Join(t.ArtifactDir(), "db.kvega")
@@ -869,64 +833,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
-			// Force error by omitting the , and subsequent key.
-			_, err = edb.writer.WriteString("D\n")
+			// Force error by only writing row identifier and the length portion of the key.
+			var buf bytes.Buffer
+			buf.WriteByte(binfmt.DeleteRowIdent)
+			binfmt.WriteInt(&buf, 5)
+
+			_, err = edb.writer.Write(buf.Bytes())
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
 			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumns)
-		})
-
-		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with an empty key column", func(t *testing.T) {
-			t.Parallel()
-
-			path := filepath.Join(t.ArtifactDir(), "db.kvega")
-
-			edb, err := OpenEmbeddedDB(path)
-			assert.NoError(t, err)
-
-			defer func() {
-				assert.NoError(t, edb.Close())
-			}()
-
-			// Force error by omitting the key.
-			_, err = edb.writer.WriteString("D,\n")
-			assert.NoError(t, err)
-
-			value, err := edb.Get("key")
-			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
-		})
-
-		t.Run("returns InvalidRowError(ErrInvalidRowColumn) if encountering a row with a key that's not encoded as expected", func(t *testing.T) {
-			t.Parallel()
-
-			path := filepath.Join(t.ArtifactDir(), "db.kvega")
-
-			edb, err := OpenEmbeddedDB(path)
-			assert.NoError(t, err)
-
-			defer func() {
-				assert.NoError(t, edb.Close())
-			}()
-
-			// Force error by using invalid base64 in key column.
-			_, err = edb.writer.WriteString("D,****\n")
-			assert.NoError(t, err)
-
-			value, err := edb.Get("key")
-			assert.Nil(t, value)
-
-			var ire *InvalidRowError
-			assert.ErrorAs(t, err, &ire)
-			assert.ErrorIs(t, ire.cause, ErrInvalidRowColumn)
+			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
+			assert.ErrorContains(t, err, "read delete row")
 		})
 
 		t.Run("returns ErrNotFound when a delete row is found for the key", func(t *testing.T) {
@@ -997,4 +915,23 @@ func TestEmbeddedDBGet(t *testing.T) {
 			assert.ErrorIs(t, err, ErrNotFound)
 		})
 	})
+}
+
+func readRows(edb *EmbeddedDB, reader *bufio.Reader) ([]row, error) {
+	rows := make([]row, 0, 2)
+
+	for {
+		row, _, err := edb.readRow(reader)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		rows = append(rows, row)
+	}
+
+	return rows, nil
 }

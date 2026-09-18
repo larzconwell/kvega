@@ -1,8 +1,8 @@
 package kvega
 
 import (
-	"encoding/base64"
-	"encoding/csv"
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -11,50 +11,21 @@ import (
 	"runtime"
 	"sync"
 	"sync/atomic"
+
+	"github.com/larzconwell/kvega/binfmt"
 )
 
 var _ DB = (*EmbeddedDB)(nil)
 
-const (
-	setType    = 'S'
-	deleteType = 'D'
-)
-
 var (
 	// ErrEmptyKey is returned when the given key is empty.
 	ErrEmptyKey = errors.New("kvega: empty key")
-	// ErrInvalidRowType is returned when row data has an invalid type.
-	ErrInvalidRowType = errors.New("kvega: invalid row type")
-	// ErrInvalidRowColumns is returned when row data contains an invalid number of columns.
-	ErrInvalidRowColumns = errors.New("kvega: invalid row columns")
-	// ErrInvalidRowColumn is returned when row data contains invalid column data.
-	ErrInvalidRowColumn = errors.New("kvega: invalid row column")
 )
 
 type row struct {
-	typ          byte
-	key          string
-	encodedValue *string
-}
-
-// InvalidRowError represents invalid database row data and the cause for the invalid data.
-type InvalidRowError struct {
+	ident byte
 	key   string
-	cause error
-}
-
-// Error implements error interface.
-func (ire *InvalidRowError) Error() string {
-	if ire.key != "" {
-		return fmt.Sprintf(`kvega: invalid row data for key "%s": %s`, ire.key, ire.cause.Error())
-	}
-
-	return "kvega: invalid row data: " + ire.cause.Error()
-}
-
-// Unwrap implements error unwrapping for errors.Is/errors.As.
-func (ire *InvalidRowError) Unwrap() error {
-	return ire.cause
+	value *[]byte
 }
 
 // EmbeddedDB is an implementation of DB that provides access to a database backed by
@@ -198,7 +169,9 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 		value = make([]byte, 0)
 	}
 
-	return edb.writeRow(setType, []byte(key), value)
+	return edb.writeRow(func(writer *bytes.Buffer) (string, error) {
+		return key, binfmt.WriteSetRow(writer, key, value)
+	})
 }
 
 // Delete handles deleting the provided key if one exists.
@@ -213,7 +186,9 @@ func (edb *EmbeddedDB) Delete(key string) error {
 		return ErrEmptyKey
 	}
 
-	return edb.writeRow(deleteType, []byte(key), nil)
+	return edb.writeRow(func(writer *bytes.Buffer) (string, error) {
+		return key, binfmt.WriteDeleteRow(writer, key)
+	})
 }
 
 // Get returns the value that's associated with the key if one exists.
@@ -246,15 +221,12 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
-	reader := csv.NewReader(file)
-	reader.Comma = ','
-	reader.FieldsPerRecord = -1
-	reader.ReuseRecord = true
-
 	var foundRow row
 
+	reader := bufio.NewReader(file)
+
 	if foundOffset {
-		row, err := edb.readRow(reader)
+		row, _, err := edb.readRow(reader)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
@@ -264,7 +236,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		}
 	} else {
 		for {
-			row, err := edb.readRow(reader)
+			row, _, err := edb.readRow(reader)
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -283,64 +255,20 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		return nil, ErrNotFound
 	}
 
-	switch foundRow.typ {
-	case setType:
-		if foundRow.encodedValue == nil {
-			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumns}
-		}
-
-		decodedValue, err := base64.StdEncoding.DecodeString(*foundRow.encodedValue)
-		if err != nil {
-			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumn}
-		}
-
-		return decodedValue, nil
-	case deleteType:
-		if foundRow.encodedValue != nil {
-			return nil, &InvalidRowError{key: key, cause: ErrInvalidRowColumns}
-		}
-
+	switch foundRow.ident {
+	case binfmt.SetRowIdent:
+		return *foundRow.value, nil
+	case binfmt.DeleteRowIdent:
 		return nil, ErrNotFound
 	default:
-		return nil, &InvalidRowError{key: key, cause: ErrInvalidRowType}
+		panic("unreachable")
 	}
 }
 
-// writeRow writes the given row data and updates the index for the
-// key to point to the offset for the newly written row. The value
-// argument is only written if not nil, care must be taken by the
-// caller to ensure that nil is only passed if there is no value
-// intended to be written.
-func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
-	var encodedValueLen int
-
-	baseRowLen := 3
-	encodedKeyLen := base64.StdEncoding.EncodedLen(len(key))
-
-	if value != nil {
-		baseRowLen++
-		encodedValueLen = base64.StdEncoding.EncodedLen(len(value))
-	}
-
-	row := make([]byte, baseRowLen+encodedKeyLen+encodedValueLen)
-
-	row[0] = typ
-	row[1] = ','
-	rowOffset := 2
-
-	base64.StdEncoding.Encode(row[rowOffset:], key)
-	rowOffset += encodedKeyLen
-
-	if value != nil {
-		row[rowOffset] = ','
-		rowOffset++
-
-		base64.StdEncoding.Encode(row[rowOffset:], value)
-		rowOffset += encodedValueLen
-	}
-
-	row[rowOffset] = '\n'
-
+// writeRow writes row data by filling a buffer using the given
+// fill function and updates the index for the returned key to
+// the offset to the newly written row.
+func (edb *EmbeddedDB) writeRow(fill func(*bytes.Buffer) (string, error)) error {
 	edb.wmu.Lock()
 	defer edb.wmu.Unlock()
 
@@ -350,61 +278,62 @@ func (edb *EmbeddedDB) writeRow(typ byte, key, value []byte) error {
 		return fmt.Errorf("kvega: failed to seek writer: %w", err)
 	}
 
-	_, err = edb.writer.Write(row)
+	var buf bytes.Buffer
+
+	key, err := fill(&buf)
+	if err != nil {
+		return fmt.Errorf("kvega: failed to fill row: %w", err)
+	}
+
+	_, err = io.Copy(edb.writer, &buf)
 	if err != nil {
 		return fmt.Errorf("kvega: failed to write row: %w", err)
 	}
 
 	edb.imu.Lock()
-	edb.index[string(key)] = offset
+	edb.index[key] = offset
 	edb.imu.Unlock()
 
 	return nil
 }
 
-// readRow reads one row from the given CSV reader, returning io.EOF
-// if we've reached the end of the file. All validation are done in
-// readRow except validating the row type and any value in the row.
-func (edb *EmbeddedDB) readRow(reader *csv.Reader) (row, error) {
-	columns, err := reader.Read()
+// readRow reads one row from the reader, returning io.EOF
+// if we've reached the end of the file.
+func (edb *EmbeddedDB) readRow(reader *bufio.Reader) (row, int, error) {
+	rowIdent, err := binfmt.ReadRowIdent(reader)
 	if errors.Is(err, io.EOF) {
-		return row{}, io.EOF
+		return row{}, 0, io.EOF
 	}
 
 	if err != nil {
-		return row{}, fmt.Errorf("kvega: failed to read row: %w", err)
+		return row{}, 0, fmt.Errorf("kvega: failed to read row identifier: %w", err)
 	}
 
-	if len(columns) < 2 {
-		return row{}, &InvalidRowError{cause: ErrInvalidRowColumns}
+	switch rowIdent {
+	case binfmt.SetRowIdent:
+		key, value, n, err := binfmt.ReadSetRow(reader)
+		if err != nil {
+			return row{}, 1 + n, fmt.Errorf("kvega: failed to read set row: %w", err)
+		}
+
+		return row{
+			ident: binfmt.SetRowIdent,
+			key:   key,
+			value: &value,
+		}, 1 + n, nil
+	case binfmt.DeleteRowIdent:
+		key, n, err := binfmt.ReadDeleteRow(reader)
+		if err != nil {
+			return row{}, 1 + n, fmt.Errorf("kvega: failed to read delete row: %w", err)
+		}
+
+		return row{
+			ident: binfmt.DeleteRowIdent,
+			key:   key,
+		}, 1 + n, nil
+	default:
+		panic("unreachable")
 	}
-
-	if len(columns[0]) != 1 {
-		return row{}, &InvalidRowError{cause: ErrInvalidRowType}
-	}
-
-	typ := columns[0][0]
-
-	encodedKey := columns[1]
-	if len(encodedKey) == 0 {
-		return row{}, &InvalidRowError{cause: ErrInvalidRowColumn}
-	}
-
-	decodedKey, err := base64.StdEncoding.DecodeString(encodedKey)
-	if err != nil {
-		return row{}, &InvalidRowError{cause: ErrInvalidRowColumn}
-	}
-
-	var encodedValue *string
-	if len(columns) > 2 {
-		encodedValue = &columns[2]
-	}
-
-	return row{
-		typ:          typ,
-		key:          string(decodedKey),
-		encodedValue: encodedValue,
-	}, nil
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,
@@ -412,8 +341,6 @@ func (edb *EmbeddedDB) readRow(reader *csv.Reader) (row, error) {
 // does not take a lock, it is not safe to call concurrently. It only does
 // minimal validation to get valid keys from the file.
 func (edb *EmbeddedDB) buildIndex() error {
-	var offset int64
-
 	file := edb.readers[0]
 
 	_, err := file.Seek(0, io.SeekStart)
@@ -421,14 +348,13 @@ func (edb *EmbeddedDB) buildIndex() error {
 		return fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
+	var offset int64
+
 	index := make(map[string]int64)
-	reader := csv.NewReader(file)
-	reader.Comma = ','
-	reader.FieldsPerRecord = -1
-	reader.ReuseRecord = true
+	reader := bufio.NewReader(file)
 
 	for {
-		row, err := edb.readRow(reader)
+		row, n, err := edb.readRow(reader)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -438,7 +364,7 @@ func (edb *EmbeddedDB) buildIndex() error {
 		}
 
 		index[row.key] = offset
-		offset = reader.InputOffset()
+		offset += int64(n)
 	}
 
 	edb.index = index
