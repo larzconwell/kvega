@@ -13,6 +13,15 @@ import (
 func TestWriteUint(t *testing.T) {
 	t.Parallel()
 
+	t.Run("writes zero in one byte", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		WriteUint(&buf, uint(0))
+
+		assert.Equal(t, []byte{0}, buf.Bytes())
+	})
+
 	t.Run("writes small uint in one byte", func(t *testing.T) {
 		t.Parallel()
 
@@ -140,6 +149,19 @@ func TestReadUint(t *testing.T) {
 		assert.Zero(t, value)
 		assert.Equal(t, 2, n)
 		assert.ErrorIs(t, err, ErrReadUintOverflow)
+	})
+
+	t.Run("reads zero encoded in one byte", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		buf.WriteByte(0)
+
+		value, n, err := ReadUint[uint](bufio.NewReader(&buf))
+		assert.NoError(t, err)
+
+		assert.Equal(t, 1, n)
+		assert.Equal(t, uint(0), value)
 	})
 
 	t.Run("reads small uint encoded in one byte", func(t *testing.T) {

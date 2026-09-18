@@ -47,6 +47,10 @@ func WriteUint[T constraints.Unsigned](writer *bytes.Buffer, value T) {
 		size++
 	}
 
+	if size == 0 {
+		size = 1
+	}
+
 	bytes := make([]byte, size)
 	idx := size - 1
 	last := true

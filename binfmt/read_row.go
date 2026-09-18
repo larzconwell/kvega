@@ -14,7 +14,8 @@ var (
 )
 
 // ReadRowIdent reads a row identifier from the reader and returns it if it's
-// valid. If the row identifier is invalid ErrRowIdentInvalid is returned.
+// valid. If the row identifier is invalid ErrRowIdentInvalid is returned and
+// the read byte is unread causing this error to cycle.
 func ReadRowIdent(reader *bufio.Reader) (byte, error) {
 	ident, err := reader.ReadByte()
 	if err != nil {

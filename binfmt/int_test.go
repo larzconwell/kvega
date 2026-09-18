@@ -13,6 +13,15 @@ import (
 func TestWriteInt(t *testing.T) {
 	t.Parallel()
 
+	t.Run("writes zero zigzag encoded int in one byte", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		WriteInt(&buf, 0)
+
+		assert.Equal(t, []byte{0}, buf.Bytes())
+	})
+
 	t.Run("writes small positive zigzag encoded int in one byte", func(t *testing.T) {
 		t.Parallel()
 
@@ -202,6 +211,19 @@ func TestReadInt(t *testing.T) {
 		assert.Zero(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, ErrReadIntOverflow)
+	})
+
+	t.Run("reads zero zigzag encoded int in one byte", func(t *testing.T) {
+		t.Parallel()
+
+		var buf bytes.Buffer
+		buf.WriteByte(0)
+
+		value, n, err := ReadInt[int](bufio.NewReader(&buf))
+		assert.NoError(t, err)
+
+		assert.Equal(t, 1, n)
+		assert.Equal(t, 0, value)
 	})
 
 	t.Run("reads small positive zigzag encoded int in one byte", func(t *testing.T) {
