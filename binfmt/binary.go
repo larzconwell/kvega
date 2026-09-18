@@ -14,7 +14,7 @@ const (
 )
 
 // WriteBinary writes the length of the slice to the writer using
-// WriteUint and then the slice itself is written. The slice may
+// WriteInt and then the slice itself is written. The slice may
 // contain any byte including NUL.
 func WriteBinary(writer *bytes.Buffer, value []byte) {
 	WriteInt(writer, int64(len(value)))
@@ -22,7 +22,7 @@ func WriteBinary(writer *bytes.Buffer, value []byte) {
 }
 
 // ReadBinary reads a slice from reader, first by reading the length
-// using ReadUint, followed by reading the actual bytes themselves.
+// using ReadInt, followed by reading the actual bytes themselves.
 func ReadBinary(reader *bufio.Reader) ([]byte, int, error) {
 	length, lenn, err := ReadInt[int64](reader)
 	if err != nil {

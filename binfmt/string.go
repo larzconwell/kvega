@@ -15,7 +15,7 @@ var (
 )
 
 // WriteString writes the length of the string in bytes to the writer
-// using WriteUint and then the bytes of the string are written.
+// using WriteInt and then the bytes of the string are written.
 // ErrWriteStringInvalid is returned when value is not valid UTF-8.
 func WriteString(writer *bytes.Buffer, value string) error {
 	if !utf8.ValidString(value) {
@@ -29,7 +29,7 @@ func WriteString(writer *bytes.Buffer, value string) error {
 }
 
 // ReadString reads a string from reader, first by reading the length in
-// bytes using ReadUint, followed by reading the bytes themselves.
+// bytes using ReadInt, followed by reading the bytes themselves.
 // ErrReadStringInvalid is returned when the bytes read contain
 // invalid UTF-8 runes.
 func ReadString(reader *bufio.Reader) (string, int, error) {
