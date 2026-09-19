@@ -2,7 +2,6 @@ package binfmt
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -13,17 +12,17 @@ const (
 	SetRowIdent = 'S'
 )
 
-// WriteSetRow writes a set row with the given key and value.
-func WriteSetRow(writer *bytes.Buffer, key string, value []byte) error {
-	writer.WriteByte(SetRowIdent)
+// SetRow encodes a set row with key and value adding it to the encoder.
+func (enc *Encoder) SetRow(key string, value []byte) error {
+	enc.Buffer.WriteByte(SetRowIdent)
 
-	err := WriteString(writer, key)
+	err := enc.String(key)
 	if err != nil {
-		return fmt.Errorf("binfmt: failed to write key: %w", err)
+		return fmt.Errorf("binfmt: failed to encode key: %w", err)
 	}
 
-	writer.WriteByte('B')
-	WriteBinary(writer, value)
+	enc.Buffer.WriteByte(BinaryIdent)
+	enc.Binary(value)
 
 	return nil
 }

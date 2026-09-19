@@ -13,12 +13,16 @@ const (
 	BinaryIdent = 'B'
 )
 
-// WriteBinary writes the length of the slice to the writer using
-// WriteInt and then the slice itself is written. The slice may
-// contain any byte including NUL.
-func WriteBinary(writer *bytes.Buffer, value []byte) {
-	WriteInt(writer, int64(len(value)))
-	writer.Write(value)
+// Binary encodes value by adding its length to the encoders current buffer
+// and then moves the current buffer to the writes list, followed by adding
+// value to the writes list without a copy of value, it finally creates
+// a new empty current buffer for further writes. value may contain any
+// byte including NUL.
+func (enc *Encoder) Binary(value []byte) {
+	enc.Int(int64(len(value)))
+
+	enc.writes = append(enc.writes, enc.Buffer, bytes.NewReader(value))
+	enc.Buffer = new(bytes.Buffer)
 }
 
 // ReadBinary reads a slice from reader, first by reading the length

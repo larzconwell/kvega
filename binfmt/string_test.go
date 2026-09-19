@@ -4,45 +4,62 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriteString(t *testing.T) {
+func TestEncoderString(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns ErrStringInvalid when string is not valid UTF-8", func(t *testing.T) {
 		t.Parallel()
 
-		err := WriteString(nil, string([]byte{0xff, 0xfe, 0xfd}))
+		enc := NewEncoder()
+		err := enc.String(string([]byte{0xff, 0xfe, 0xfd}))
 		assert.ErrorIs(t, err, ErrStringInvalid)
 	})
 
-	t.Run("writes empty string to writer", func(t *testing.T) {
+	t.Run("encodes empty string", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
-		err := WriteString(&buf, "")
+		enc := NewEncoder()
+		err := enc.String("")
 		assert.NoError(t, err)
 
-		assert.Equal(t, []byte{0}, buf.Bytes())
+		assert.Len(t, enc.writes, 2)
+		assert.NotNil(t, enc.Buffer)
+		assert.NotSame(t, enc.writes[0], enc.Buffer)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{0}, enc.writes[0].(*bytes.Buffer).Bytes())
+		//nolint:forcetypeassert
+		assert.Zero(t, enc.writes[1].(*strings.Reader).Size())
 	})
 
-	t.Run("writes length and value to writer", func(t *testing.T) {
+	t.Run("encodes length and value", func(t *testing.T) {
 		t.Parallel()
 
 		value := "Cześć, こんにちは, 你好"
+		enc := NewEncoder()
 
-		var buf bytes.Buffer
-
-		err := WriteString(&buf, value)
+		err := enc.String(value)
 		assert.NoError(t, err)
 
-		assert.Equal(t, len(value)+1, buf.Len())
-		assert.Equal(t, byte(0b0100_0000), buf.Bytes()[0])
-		assert.Equal(t, value, string(buf.Bytes()[1:]))
+		assert.Len(t, enc.writes, 2)
+		assert.NotNil(t, enc.Buffer)
+		assert.NotSame(t, enc.writes[0], enc.Buffer)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			0b0100_0000,
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, value, string(buf))
 	})
 }
 
@@ -62,11 +79,14 @@ func TestReadString(t *testing.T) {
 	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF before the value has been completely read", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 5)
-		buf.Write(make([]byte, 2))
+		enc := NewEncoder()
+		enc.Int(5)
+		enc.Buffer.Write(make([]byte, 2))
 
-		value, n, err := ReadString(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		value, n, err := ReadString(reader)
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -76,14 +96,14 @@ func TestReadString(t *testing.T) {
 	t.Run("returns error from reading value", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 5)
-		buf.Write(make([]byte, 5))
+		enc := NewEncoder()
+		enc.Int(5)
+		enc.Buffer.Write(make([]byte, 5))
 
 		value, n, err := ReadString(bufio.NewReader(&errReadWriter{
-			buf:      &buf,
-			err:      io.ErrClosedPipe,
-			errAfter: 5,
+			buf:   enc.Buffer,
+			err:   io.ErrClosedPipe,
+			errOn: 5,
 		}))
 
 		assert.Empty(t, value)
@@ -97,11 +117,14 @@ func TestReadString(t *testing.T) {
 
 		value := []byte{0xff, 0xfe, 0xfd}
 
-		var buf bytes.Buffer
-		WriteInt(&buf, len(value))
-		buf.Write(value)
+		enc := NewEncoder()
+		enc.Int(int64(len(value)))
+		enc.Buffer.Write(value)
 
-		actual, n, err := ReadString(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		actual, n, err := ReadString(reader)
 		assert.Empty(t, actual)
 		assert.Equal(t, len(value)+1, n)
 		assert.ErrorIs(t, err, ErrStringInvalid)
@@ -110,10 +133,13 @@ func TestReadString(t *testing.T) {
 	t.Run("returns empty string from reader", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 0)
+		enc := NewEncoder()
+		enc.Int(0)
 
-		actual, n, err := ReadString(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		actual, n, err := ReadString(reader)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -124,12 +150,15 @@ func TestReadString(t *testing.T) {
 		t.Parallel()
 
 		value := "Cześć, こんにちは, 你好"
+		enc := NewEncoder()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, len(value))
-		buf.WriteString(value)
+		enc.Int(int64(len(value)))
+		enc.Buffer.WriteString(value)
 
-		actual, n, err := ReadString(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		actual, n, err := ReadString(reader)
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+1, n)

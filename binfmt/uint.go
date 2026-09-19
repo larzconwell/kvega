@@ -2,7 +2,6 @@ package binfmt
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -12,8 +11,6 @@ import (
 	"golang.org/x/exp/constraints"
 )
 
-const byteSize = 7
-
 var (
 	// ErrReadUintInvalid is returned when a uint cannot be read due to invalid reader data.
 	ErrReadUintInvalid = errors.New("binfmt: read uint failed due to invalid reader data")
@@ -21,26 +18,26 @@ var (
 	ErrReadUintOverflow = errors.New("binfmt: read uint does not fit in uint size")
 )
 
-// WriteUint writes a uint to writer using big-endian variable length integer encoding. The
-// variable length integer encoding may write from 1 to 10 bytes depending on the value.
+// Uint encodes value using big-endian variable length integer encoding and adds it to the
+// encoder. 1 to 10 bytes may be added to the encoder depending on the value.
 //
-// Variable length integer encoding works by splitting the bits of a given value up into chunks
-// of 7 bits, these chunks are structured as bytes where the least significant portion of the
-// bytes contain the 7 bits from the chunks. For the bytes, the most significant bit is reserved
-// and if set signifies that more bytes should be read, if unset signifies that the current byte
-// is the last byte in the variable length integer data. WriteUint splits the value up and orders
-// the resulting bytes in big-endian order.
+// Variable length integer encoding works by splitting value into 7 bit chunks, where the
+// 7 bits of value data are located in the least significant portion of a byte, the most
+// significant bit in the chunk being reserved as a continuation bit to signal that more
+// bytes should be read. Uint splits the value up and orders the resulting bytes in
+// big-endian order.
 //
-// Here is an example of how a uint would be encoded and written to the writer. Given a value
-// 0x108a, the following is a mapping between the values binary representation
-// and the written bytes binary representation.
+// Here is an example of how a uint would be encoded. Given a value 0x108a, the following
+// is a mapping between the values binary representation and the encoded bytes binary
+// representation.
 //
-// [___10000] [10001010] - Binary representation of value.
-// [__100001] [_0001010] - Spliting value into 7 bit chunks.
+// [___10000] [10001010] - Binary representation of value 0x108a.
+// [__100001] [_0001010] - Splitting value into 7 bit chunks.
 // [10100001] [00001010] - Adding continuation bits to the 7 bit chunks.
-func WriteUint[T constraints.Unsigned](writer *bytes.Buffer, value T) {
+func (enc *Encoder) Uint(value uint64) {
 	// Determine number of bytes required to store encoded value.
-	msbidx := bits.Len64(uint64(value))
+	msbidx := bits.Len64(value)
+	byteSize := 7
 	size := msbidx / byteSize
 
 	if msbidx%byteSize > 0 {
@@ -67,7 +64,7 @@ func WriteUint[T constraints.Unsigned](writer *bytes.Buffer, value T) {
 	}
 
 	bytes[idx] = setContinuation(byte(value), !last)
-	writer.Write(bytes)
+	enc.Buffer.Write(bytes)
 }
 
 // ReadUint reads a big-endian variable length encoded uint from reader. It will read

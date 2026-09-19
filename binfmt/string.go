@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -14,24 +15,28 @@ var (
 	ErrStringInvalid = errors.New("binfmt: string contains invalid data")
 )
 
-// WriteString writes the length of the string in bytes to the writer
-// using WriteInt and then the bytes of the string are written.
-// ErrWriteStringInvalid is returned when value is not valid UTF-8.
-func WriteString(writer *bytes.Buffer, value string) error {
+// String encodes value by adding its length to the encoders current buffer
+// and then moves the current buffer to the writes list, followed by adding
+// value to the writes list, it finally creates a new empty current buffer
+// for further writes. ErrStringInvalid is returned when value is not
+// valid UTF-8.
+func (enc *Encoder) String(value string) error {
 	if !utf8.ValidString(value) {
 		return ErrStringInvalid
 	}
 
-	WriteInt(writer, int64(len(value)))
-	writer.WriteString(value)
+	enc.Int(int64(len(value)))
+
+	enc.writes = append(enc.writes, enc.Buffer, strings.NewReader(value))
+	enc.Buffer = new(bytes.Buffer)
 
 	return nil
 }
 
 // ReadString reads a string from reader, first by reading the length in
 // bytes using ReadInt, followed by reading the bytes themselves.
-// ErrReadStringInvalid is returned when the bytes read contain
-// invalid UTF-8 runes.
+// ErrStringInvalid is returned when the bytes read contain invalid
+// UTF-8 runes.
 func ReadString(reader *bufio.Reader) (string, int, error) {
 	length, lenn, err := ReadInt[int64](reader)
 	if err != nil {

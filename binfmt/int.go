@@ -2,7 +2,6 @@ package binfmt
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"unsafe"
@@ -17,20 +16,25 @@ var (
 	ErrReadIntOverflow = errors.New("binfmt: read int does not fit in int size")
 )
 
-// WriteInt writes an int to writer using zigzag encoding along with big-endian variable
-// length integer encoding. It may write between 1 to 10 bytes depending on the value.
+// Int encodes value using zigzag encoding along with big-endian variable length integer
+// encoding and adds it to the encoder. 1 to 10 bytes may be added to the encoder
+// depending on the value.
 //
-// The first step is zigzag encoding which is a method to represent a signed T value
-// as an unsigned value by evenly spreading positive and negative numbers across the
-// unsigned value range. Negative numbers become double their absolute value minus
-// one. Positive numbers meanwhile become double their absolute value.
-func WriteInt[T constraints.Signed](writer *bytes.Buffer, value T) {
+// The first step is zigzag encoding which is a method to represent a signed integer
+// as an unsigned integer by evenly spreading positive and negative values across the
+// unsigned integer range. Negative values become double their absolute value minus
+// one. Positive values meanwhile become double their absolute value.
+//
+// After the int64 has been converted to a uint64, big-endian variable length
+// inger encoding is done, context to which can be gathered by reading Uint.
+func (enc *Encoder) Int(value int64) {
 	bitSize := unsafe.Sizeof(value) * 8
 
-	// Use uint64 since we have no clean way in Go to get an unsigned
-	// version of T without adding more type parameters.
+	// This overflow is fine, tests validate the behavior when
+	// encoding math.MinInt64 and math.MaxInt64.
+	//gosec:disable G115
 	uValue := (uint64(value) << 1) ^ uint64(value>>(bitSize-1))
-	WriteUint(writer, uValue)
+	enc.Uint(uValue)
 }
 
 // ReadInt reads a big-endian variable length encoded uint that contains a

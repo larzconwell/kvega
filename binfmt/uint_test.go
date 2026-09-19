@@ -10,45 +10,45 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriteUint(t *testing.T) {
+func TestEncoderUint(t *testing.T) {
 	t.Parallel()
 
-	t.Run("writes zero in one byte", func(t *testing.T) {
+	t.Run("encodes zero in one byte", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteUint(&buf, uint(0))
+		enc := NewEncoder()
+		enc.Uint(0)
 
-		assert.Equal(t, []byte{0}, buf.Bytes())
+		assert.Equal(t, []byte{0}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes small uint in one byte", func(t *testing.T) {
+	t.Run("encodes small uint in one byte", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteUint(&buf, uint(127))
+		enc := NewEncoder()
+		enc.Uint(127)
 
-		assert.Equal(t, []byte{0b0111_1111}, buf.Bytes())
+		assert.Equal(t, []byte{0b0111_1111}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes medium uint in three bytes", func(t *testing.T) {
+	t.Run("encodes medium uint in three bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteUint(&buf, uint(0xbbbb))
+		enc := NewEncoder()
+		enc.Uint(0xbbbb)
 
 		assert.Equal(t, []byte{
 			0b1000_0010,
 			0b1111_0111,
 			0b0011_1011,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes large uint in nine bytes", func(t *testing.T) {
+	t.Run("encodes large uint in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteUint(&buf, uint64(0xbbb_bbbb_bbbb_bbbb))
+		enc := NewEncoder()
+		enc.Uint(0xbbb_bbbb_bbbb_bbbb)
 
 		assert.Equal(t, []byte{
 			0b1000_1011,
@@ -60,14 +60,14 @@ func TestWriteUint(t *testing.T) {
 			0b1110_1110,
 			0b1111_0111,
 			0b0011_1011,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes max uint in ten bytes", func(t *testing.T) {
+	t.Run("encodes max uint in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteUint(&buf, uint64(math.MaxUint64))
+		enc := NewEncoder()
+		enc.Uint(math.MaxUint64)
 
 		assert.Equal(t, []byte{
 			0b1000_0001,
@@ -80,7 +80,7 @@ func TestWriteUint(t *testing.T) {
 			0xff,
 			0xff,
 			0b0111_1111,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 }
 

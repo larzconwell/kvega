@@ -2,7 +2,6 @@ package kvega
 
 import (
 	"bufio"
-	"bytes"
 	crypto "crypto/rand"
 	"errors"
 	"io"
@@ -756,13 +755,13 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by only writing row identifier and key.
-			var buf bytes.Buffer
-			buf.WriteByte(binfmt.SetRowIdent)
+			enc := binfmt.NewEncoder()
+			enc.Buffer.WriteByte(binfmt.SetRowIdent)
 
-			err = binfmt.WriteString(&buf, "key")
+			err = enc.String("key")
 			assert.NoError(t, err)
 
-			_, err = edb.writer.Write(buf.Bytes())
+			_, err = enc.WriteTo(edb.writer)
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")
@@ -834,11 +833,11 @@ func TestEmbeddedDBGet(t *testing.T) {
 			}()
 
 			// Force error by only writing row identifier and the length portion of the key.
-			var buf bytes.Buffer
-			buf.WriteByte(binfmt.DeleteRowIdent)
-			binfmt.WriteInt(&buf, 5)
+			enc := binfmt.NewEncoder()
+			enc.Buffer.WriteByte(binfmt.DeleteRowIdent)
+			enc.Int(5)
 
-			_, err = edb.writer.Write(buf.Bytes())
+			_, err = enc.WriteTo(edb.writer)
 			assert.NoError(t, err)
 
 			value, err := edb.Get("key")

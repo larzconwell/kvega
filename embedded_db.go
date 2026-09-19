@@ -2,7 +2,6 @@ package kvega
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -164,13 +163,8 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 		return ErrEmptyKey
 	}
 
-	// Value needs to be allocated so it writes a value to the file.
-	if value == nil {
-		value = make([]byte, 0)
-	}
-
-	return edb.writeRow(func(writer *bytes.Buffer) (string, error) {
-		return key, binfmt.WriteSetRow(writer, key, value)
+	return edb.writeRow(func(enc *binfmt.Encoder) (string, error) {
+		return key, enc.SetRow(key, value)
 	})
 }
 
@@ -186,8 +180,8 @@ func (edb *EmbeddedDB) Delete(key string) error {
 		return ErrEmptyKey
 	}
 
-	return edb.writeRow(func(writer *bytes.Buffer) (string, error) {
-		return key, binfmt.WriteDeleteRow(writer, key)
+	return edb.writeRow(func(enc *binfmt.Encoder) (string, error) {
+		return key, enc.DeleteRow(key)
 	})
 }
 
@@ -268,7 +262,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 // writeRow writes row data by filling a buffer using the given
 // fill function and updates the index for the returned key to
 // the offset to the newly written row.
-func (edb *EmbeddedDB) writeRow(fill func(*bytes.Buffer) (string, error)) error {
+func (edb *EmbeddedDB) writeRow(encode func(enc *binfmt.Encoder) (string, error)) error {
 	edb.wmu.Lock()
 	defer edb.wmu.Unlock()
 
@@ -278,14 +272,14 @@ func (edb *EmbeddedDB) writeRow(fill func(*bytes.Buffer) (string, error)) error 
 		return fmt.Errorf("kvega: failed to seek writer: %w", err)
 	}
 
-	var buf bytes.Buffer
+	enc := binfmt.NewEncoder()
 
-	key, err := fill(&buf)
+	key, err := encode(enc)
 	if err != nil {
-		return fmt.Errorf("kvega: failed to fill row: %w", err)
+		return fmt.Errorf("kvega: failed to encode row: %w", err)
 	}
 
-	_, err = io.Copy(edb.writer, &buf)
+	_, err = enc.WriteTo(edb.writer)
 	if err != nil {
 		return fmt.Errorf("kvega: failed to write row: %w", err)
 	}

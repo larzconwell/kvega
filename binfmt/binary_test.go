@@ -9,19 +9,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriteBinary(t *testing.T) {
+func TestEncoderBinary(t *testing.T) {
 	t.Parallel()
 
-	t.Run("writes empty binary to writer", func(t *testing.T) {
+	t.Run("encodes empty binary", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteBinary(&buf, nil)
+		enc := NewEncoder()
+		enc.Binary(nil)
 
-		assert.Equal(t, []byte{0}, buf.Bytes())
+		assert.Len(t, enc.writes, 2)
+		assert.NotNil(t, enc.Buffer)
+		assert.NotSame(t, enc.writes[0], enc.Buffer)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{0}, enc.writes[0].(*bytes.Buffer).Bytes())
+		//nolint:forcetypeassert
+		assert.Zero(t, enc.writes[1].(*bytes.Reader).Size())
 	})
 
-	t.Run("writes length and value to writer", func(t *testing.T) {
+	t.Run("encodes length and value", func(t *testing.T) {
 		t.Parallel()
 
 		value := make([]byte, 128)
@@ -29,15 +36,23 @@ func TestWriteBinary(t *testing.T) {
 			value[idx] = byte(idx) % 127
 		}
 
-		var buf bytes.Buffer
-		WriteBinary(&buf, value)
+		enc := NewEncoder()
+		enc.Binary(value)
 
-		assert.Equal(t, len(value)+2, buf.Len())
+		assert.Len(t, enc.writes, 2)
+		assert.NotNil(t, enc.Buffer)
+		assert.NotSame(t, enc.writes[0], enc.Buffer)
+
+		//nolint:forcetypeassert
 		assert.Equal(t, []byte{
 			0b1000_0010,
 			0,
-		}, buf.Bytes()[:2])
-		assert.Equal(t, value, buf.Bytes()[2:])
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*bytes.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, value, buf)
 	})
 }
 
@@ -57,11 +72,14 @@ func TestReadBinary(t *testing.T) {
 	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF before the value has been completely read", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 5)
-		buf.Write(make([]byte, 2))
+		enc := NewEncoder()
+		enc.Int(5)
+		enc.Buffer.Write(make([]byte, 2))
 
-		value, n, err := ReadBinary(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		value, n, err := ReadBinary(reader)
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -71,14 +89,14 @@ func TestReadBinary(t *testing.T) {
 	t.Run("returns error from reading value", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 5)
-		buf.Write(make([]byte, 5))
+		enc := NewEncoder()
+		enc.Int(5)
+		enc.Buffer.Write(make([]byte, 5))
 
 		value, n, err := ReadBinary(bufio.NewReader(&errReadWriter{
-			buf:      &buf,
-			err:      io.ErrClosedPipe,
-			errAfter: 5,
+			buf:   enc.Buffer,
+			err:   io.ErrClosedPipe,
+			errOn: 5,
 		}))
 
 		assert.Empty(t, value)
@@ -90,10 +108,13 @@ func TestReadBinary(t *testing.T) {
 	t.Run("returns empty binary from reader", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 0)
+		enc := NewEncoder()
+		enc.Int(0)
 
-		actual, n, err := ReadBinary(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		actual, n, err := ReadBinary(reader)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -108,11 +129,14 @@ func TestReadBinary(t *testing.T) {
 			value[idx] = byte(idx) % 127
 		}
 
-		var buf bytes.Buffer
-		WriteInt(&buf, len(value))
-		buf.Write(value)
+		enc := NewEncoder()
+		enc.Int(int64(len(value)))
+		enc.Buffer.Write(value)
 
-		actual, n, err := ReadBinary(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		actual, n, err := ReadBinary(reader)
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+2, n)

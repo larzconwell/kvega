@@ -4,42 +4,57 @@ import (
 	"bufio"
 	"bytes"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriteSetRow(t *testing.T) {
+func TestEncodeSetRow(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from WriteString", func(t *testing.T) {
+	t.Run("returns error from encoding key", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
-		err := WriteSetRow(&buf, string([]byte{0xff, 0xfe, 0xfd}), []byte("value"))
+		enc := NewEncoder()
+		err := enc.SetRow(string([]byte{0xff, 0xfe, 0xfd}), []byte("value"))
 		assert.ErrorIs(t, err, ErrStringInvalid)
-		assert.ErrorContains(t, err, "write key")
+		assert.ErrorContains(t, err, "encode key")
 	})
 
-	t.Run("writes set row to writer", func(t *testing.T) {
+	t.Run("encodes set rows key and value", func(t *testing.T) {
 		t.Parallel()
-
-		var buf bytes.Buffer
 
 		key := "こんにちは"
 		value := []byte{0xff, 0xfe, 0xfd}
+		enc := NewEncoder()
 
-		err := WriteSetRow(&buf, key, value)
+		err := enc.SetRow(key, value)
 		assert.NoError(t, err)
 
-		assert.Equal(t, 1+1+15+1+1+3, buf.Len())
-		assert.Equal(t, byte(SetRowIdent), buf.Bytes()[0])
-		assert.Equal(t, byte(0b0001_1110), buf.Bytes()[1])
-		assert.Equal(t, []byte(key), buf.Bytes()[2:17])
-		assert.Equal(t, byte(BinaryIdent), buf.Bytes()[17])
-		assert.Equal(t, byte(0b0000_0110), buf.Bytes()[18])
-		assert.Equal(t, value, buf.Bytes()[19:])
+		assert.Len(t, enc.writes, 4)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			SetRowIdent,
+			0b0001_1110,
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(key), buf)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			BinaryIdent,
+			0b0000_0110,
+		}, enc.writes[2].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err = io.ReadAll(enc.writes[3].(*bytes.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, value, buf)
 	})
 }
 
@@ -66,13 +81,15 @@ func TestReadSetRow(t *testing.T) {
 	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF while reading value identifier", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
 		// Force error by omitting the value identifier and value.
-		err := WriteString(&buf, "key")
+		enc := NewEncoder()
+		err := enc.String("key")
 		assert.NoError(t, err)
 
-		key, value, n, err := ReadSetRow(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		key, value, n, err := ReadSetRow(reader)
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 4, n)
@@ -83,15 +100,17 @@ func TestReadSetRow(t *testing.T) {
 	t.Run("return ErrRowValueIdentInvalid if read an invalid value identifier", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
-		err := WriteString(&buf, "key")
+		enc := NewEncoder()
+		err := enc.String("key")
 		assert.NoError(t, err)
 
 		// Force error by writing invalid value identifier.
-		buf.WriteByte('Z')
+		enc.Buffer.WriteByte('Z')
 
-		key, value, n, err := ReadSetRow(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		key, value, n, err := ReadSetRow(reader)
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 5, n)
@@ -101,19 +120,21 @@ func TestReadSetRow(t *testing.T) {
 	t.Run("return error from ReadBinary for binary value identifier", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
-		err := WriteString(&buf, "key")
+		enc := NewEncoder()
+		err := enc.String("key")
 		assert.NoError(t, err)
 
-		buf.WriteByte(BinaryIdent)
+		enc.Buffer.WriteByte(BinaryIdent)
 
 		// Force error by writing invalid binary length.
 		for range 10 {
-			buf.WriteByte(0xff)
+			enc.Buffer.WriteByte(0xff)
 		}
 
-		key, value, n, err := ReadSetRow(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		key, value, n, err := ReadSetRow(reader)
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 4+1+10, n)
@@ -126,17 +147,18 @@ func TestReadSetRow(t *testing.T) {
 
 		key := "こんにちは"
 		value := []byte{0xff, 0xfe, 0xfd}
+		enc := NewEncoder()
 
-		var buf bytes.Buffer
-
-		err := WriteString(&buf, key)
+		err := enc.String(key)
 		assert.NoError(t, err)
 
-		buf.WriteByte(BinaryIdent)
+		enc.Buffer.WriteByte(BinaryIdent)
+		enc.Binary(value)
 
-		WriteBinary(&buf, value)
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
 
-		actualKey, actualValue, n, err := ReadSetRow(bufio.NewReader(&buf))
+		actualKey, actualValue, n, err := ReadSetRow(reader)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 16+1+4, n)

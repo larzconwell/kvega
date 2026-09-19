@@ -10,67 +10,67 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriteInt(t *testing.T) {
+func TestEncoderInt(t *testing.T) {
 	t.Parallel()
 
-	t.Run("writes zero zigzag encoded int in one byte", func(t *testing.T) {
+	t.Run("encodes zero in one byte", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 0)
+		enc := NewEncoder()
+		enc.Int(0)
 
-		assert.Equal(t, []byte{0}, buf.Bytes())
+		assert.Equal(t, []byte{0}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes small positive zigzag encoded int in one byte", func(t *testing.T) {
+	t.Run("encodes small positive int in one byte", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 50)
+		enc := NewEncoder()
+		enc.Int(50)
 
-		assert.Equal(t, []byte{0b0110_0100}, buf.Bytes())
+		assert.Equal(t, []byte{0b0110_0100}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes small negative zigzag encoded int in one byte", func(t *testing.T) {
+	t.Run("encodes small negative int in one byte", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, -50)
+		enc := NewEncoder()
+		enc.Int(-50)
 
-		assert.Equal(t, []byte{0b0110_0011}, buf.Bytes())
+		assert.Equal(t, []byte{0b0110_0011}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes medium positive zigzag encoded int in three bytes", func(t *testing.T) {
+	t.Run("encodes medium positive int in three bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, 48_059)
+		enc := NewEncoder()
+		enc.Int(48_059)
 
 		assert.Equal(t, []byte{
 			0b1000_0101,
 			0b1110_1110,
 			0b0111_0110,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes medium negative zigzag encoded int in three bytes", func(t *testing.T) {
+	t.Run("encodes medium negative int in three bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, -48_059)
+		enc := NewEncoder()
+		enc.Int(-48_059)
 
 		assert.Equal(t, []byte{
 			0b1000_0101,
 			0b1110_1110,
 			0b0111_0101,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes large positive zigzag encoded int in nine bytes", func(t *testing.T) {
+	t.Run("encodes large positive int in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, int64(845_475_770_045_021_115))
+		enc := NewEncoder()
+		enc.Int(845_475_770_045_021_115)
 
 		assert.Equal(t, []byte{
 			0b1001_0111,
@@ -82,14 +82,14 @@ func TestWriteInt(t *testing.T) {
 			0b1101_1101,
 			0b1110_1110,
 			0b0111_0110,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes large negative zigzag encoded int in nine bytes", func(t *testing.T) {
+	t.Run("encodes large negative int in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, int64(-845_475_770_045_021_115))
+		enc := NewEncoder()
+		enc.Int(-845_475_770_045_021_115)
 
 		assert.Equal(t, []byte{
 			0b10010111,
@@ -101,14 +101,14 @@ func TestWriteInt(t *testing.T) {
 			0b11011101,
 			0b11101110,
 			0b01110101,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes minimum zigzag encoded int in ten bytes", func(t *testing.T) {
+	t.Run("encodes minimum int in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, math.MinInt64)
+		enc := NewEncoder()
+		enc.Int(math.MinInt64)
 
 		assert.Equal(t, []byte{
 			0b10000001,
@@ -121,14 +121,14 @@ func TestWriteInt(t *testing.T) {
 			0xff,
 			0xff,
 			0b01111111,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("writes maximum zigzag encoded int in ten bytes", func(t *testing.T) {
+	t.Run("encodes maximum int in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-		WriteInt(&buf, math.MaxInt64)
+		enc := NewEncoder()
+		enc.Int(math.MaxInt64)
 
 		assert.Equal(t, []byte{
 			0b10000001,
@@ -141,7 +141,7 @@ func TestWriteInt(t *testing.T) {
 			0xff,
 			0xff,
 			0b01111110,
-		}, buf.Bytes())
+		}, enc.Buffer.Bytes())
 	})
 }
 

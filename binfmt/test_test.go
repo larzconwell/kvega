@@ -1,15 +1,16 @@
 package binfmt
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 )
 
 type errReadWriter struct {
-	buf      *bytes.Buffer
-	n        int
-	errAfter int
-	err      error
+	buf   *bytes.Buffer
+	n     int
+	errOn int
+	err   error
 }
 
 func (erw *errReadWriter) Read(p []byte) (int, error) {
@@ -17,7 +18,7 @@ func (erw *errReadWriter) Read(p []byte) (int, error) {
 		erw.buf = bytes.NewBuffer(nil)
 	}
 
-	maxRead := min(len(p), erw.errAfter-erw.n)
+	maxRead := min(len(p), erw.errOn-erw.n)
 
 	n, err := erw.buf.Read(p[:maxRead])
 	if err != nil {
@@ -26,7 +27,7 @@ func (erw *errReadWriter) Read(p []byte) (int, error) {
 
 	erw.n += n
 
-	if erw.n >= erw.errAfter {
+	if erw.n >= erw.errOn {
 		return n, erw.err
 	}
 
@@ -38,7 +39,7 @@ func (erw *errReadWriter) Write(p []byte) (int, error) {
 		erw.buf = bytes.NewBuffer(nil)
 	}
 
-	maxWrite := min(len(p), erw.errAfter-erw.n)
+	maxWrite := min(len(p), erw.errOn-erw.n)
 
 	n, err := erw.buf.Write(p[:maxWrite])
 	if err != nil {
@@ -47,9 +48,20 @@ func (erw *errReadWriter) Write(p []byte) (int, error) {
 
 	erw.n += n
 
-	if erw.n >= erw.errAfter {
+	if erw.n >= erw.errOn {
 		return n, erw.err
 	}
 
 	return n, nil
+}
+
+func encoderToBufReader(enc *Encoder) (*bufio.Reader, error) {
+	var buf bytes.Buffer
+
+	_, err := enc.WriteTo(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return bufio.NewReader(&buf), nil
 }

@@ -2,7 +2,6 @@ package binfmt
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 )
 
@@ -11,13 +10,13 @@ const (
 	DeleteRowIdent = 'D'
 )
 
-// WriteDeleteRow writes a delete row for the given key.
-func WriteDeleteRow(writer *bytes.Buffer, key string) error {
-	writer.WriteByte(DeleteRowIdent)
+// DeleteRow encodes a delete row with key adding it to the encoder.
+func (enc *Encoder) DeleteRow(key string) error {
+	enc.Buffer.WriteByte(DeleteRowIdent)
 
-	err := WriteString(writer, key)
+	err := enc.String(key)
 	if err != nil {
-		return fmt.Errorf("binfmt: failed to write key: %w", err)
+		return fmt.Errorf("binfmt: failed to encode key: %w", err)
 	}
 
 	return nil

@@ -3,6 +3,8 @@ package binfmt
 import (
 	"bufio"
 	"bytes"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,30 +13,36 @@ import (
 func TestWriteDeleteRow(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from WriteString", func(t *testing.T) {
+	t.Run("returns error from encoding key", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
-		err := WriteDeleteRow(&buf, string([]byte{0xff, 0xfe, 0xfd}))
+		enc := NewEncoder()
+		err := enc.DeleteRow(string([]byte{0xff, 0xfe, 0xfd}))
 		assert.ErrorIs(t, err, ErrStringInvalid)
-		assert.ErrorContains(t, err, "write key")
+		assert.ErrorContains(t, err, "encode key")
 	})
 
-	t.Run("writes delete row to writer", func(t *testing.T) {
+	t.Run("encodes delete rows key", func(t *testing.T) {
 		t.Parallel()
 
-		var buf bytes.Buffer
-
 		key := "こんにちは"
+		enc := NewEncoder()
 
-		err := WriteDeleteRow(&buf, key)
+		err := enc.DeleteRow(key)
 		assert.NoError(t, err)
 
-		assert.Equal(t, 1+1+15, buf.Len())
-		assert.Equal(t, byte(DeleteRowIdent), buf.Bytes()[0])
-		assert.Equal(t, byte(0b0001_1110), buf.Bytes()[1])
-		assert.Equal(t, []byte(key), buf.Bytes()[2:17])
+		assert.Len(t, enc.writes, 2)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			DeleteRowIdent,
+			0b0001_1110,
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(key), buf)
 	})
 }
 
@@ -61,13 +69,15 @@ func TestReadDeleteRow(t *testing.T) {
 		t.Parallel()
 
 		key := "こんにちは"
+		enc := NewEncoder()
 
-		var buf bytes.Buffer
-
-		err := WriteString(&buf, key)
+		err := enc.String(key)
 		assert.NoError(t, err)
 
-		actualKey, n, err := ReadDeleteRow(bufio.NewReader(&buf))
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		actualKey, n, err := ReadDeleteRow(reader)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 16, n)
