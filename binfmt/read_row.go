@@ -8,13 +8,13 @@ import (
 var (
 	// ErrRowIdentInvalid is returned when an invalid row identifier has been read.
 	ErrRowIdentInvalid = errors.New("binfmt: row has invalid row identifier")
-	// ErrRowValueIdentInvalid is returned when a row is read that has an invalid type identifier.
-	ErrRowValueIdentInvalid = errors.New("binfmt: row has invalid value identifier")
+	// ErrRowValueIdentInvalid is returned when a row is read that has an invalid value type identifier.
+	ErrRowValueIdentInvalid = errors.New("binfmt: row has invalid value type identifier")
 )
 
 // RowIdent reads a row identifier from the decoders reader and returns it.
 // If the row identifier is invalid, ErrRowIdentInvalid is returned and the
-// read byte is undread allowing for use later. io.EOF is returned if the
+// read byte is unread allowing for use later. io.EOF is returned if the
 // end of the decoders reader has been reached.
 func (dec *Decoder) RowIdent() (byte, error) {
 	ident, err := dec.reader.ReadByte()

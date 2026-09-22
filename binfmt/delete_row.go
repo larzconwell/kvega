@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	// DeleteRowIdent is the type identifier for a delete row.
+	// DeleteRowIdent is the row identifier for a delete row.
 	DeleteRowIdent = 'D'
 )
 

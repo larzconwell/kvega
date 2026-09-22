@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	// BinaryIdent is the type identifier for a binary value.
+	// BinaryIdent is the value type identifier for a binary value.
 	BinaryIdent = 'B'
 )
 

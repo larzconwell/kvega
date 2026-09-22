@@ -9,8 +9,8 @@ import (
 var (
 	// ErrReadIntInvalid is returned when an int cannot be read due to invalid reader data.
 	ErrReadIntInvalid = errors.New("binfmt: read int failed due to invalid reader data")
-	// ErrReadIntOverflow is returned when a read int is larger than the given int size.
-	ErrReadIntOverflow = errors.New("binfmt: read int does not fit in int size")
+	// ErrReadIntOverflow is returned when a read int is larger than int64.
+	ErrReadIntOverflow = errors.New("binfmt: read int does not fit in int64")
 )
 
 // Int encodes value using zigzag encoding along with big-endian variable length integer

@@ -11,8 +11,8 @@ import (
 var (
 	// ErrReadUintInvalid is returned when a uint cannot be read due to invalid reader data.
 	ErrReadUintInvalid = errors.New("binfmt: read uint failed due to invalid reader data")
-	// ErrReadUintOverflow is returned when a read uint is larger than the given uint size.
-	ErrReadUintOverflow = errors.New("binfmt: read uint does not fit in uint size")
+	// ErrReadUintOverflow is returned when a read uint is larger uint64.
+	ErrReadUintOverflow = errors.New("binfmt: read uint does not fit in uint64")
 )
 
 // Uint encodes value using big-endian variable length integer encoding and adds it to the

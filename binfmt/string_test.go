@@ -65,7 +65,7 @@ func TestEncoderString(t *testing.T) {
 func TestDecoderString(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from ReadInt", func(t *testing.T) {
+	t.Run("returns error from Int", func(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})

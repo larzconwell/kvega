@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	// SetRowIdent is the type identifier for a set row.
+	// SetRowIdent is the row identifier for a set row.
 	SetRowIdent = 'S'
 )
 
@@ -29,7 +29,7 @@ func (enc *Encoder) SetRow(key string, value []byte) error {
 // SetRow reads a set row from the decoders reader, expecting that the row
 // identifier has already been read to determine that the row is a set row.
 // The returned value byte slice is only valid until the next call made to
-// the Decoder. If the set row contains an invalid value identifier,
+// the Decoder. If the set row contains an invalid value type identifier,
 // ErrRowValueIdentInvalid is returned.
 func (dec *Decoder) SetRow() (string, []byte, int, error) {
 	key, keyn, err := dec.String()
@@ -43,7 +43,7 @@ func (dec *Decoder) SetRow() (string, []byte, int, error) {
 	}
 
 	if err != nil {
-		return "", nil, keyn, fmt.Errorf("binfmt: failed to read value identifier: %w", err)
+		return "", nil, keyn, fmt.Errorf("binfmt: failed to read value type identifier: %w", err)
 	}
 
 	switch valueIdent {

@@ -97,7 +97,7 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.Nil(t, value)
 		assert.Equal(t, 4, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-		assert.ErrorContains(t, err, "read value identifier")
+		assert.ErrorContains(t, err, "read value type identifier")
 	})
 
 	t.Run("return ErrRowValueIdentInvalid if read an invalid value identifier", func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.ErrorIs(t, err, ErrRowValueIdentInvalid)
 	})
 
-	t.Run("return error from ReadBinary for binary value identifier", func(t *testing.T) {
+	t.Run("return error from Binary for binary value identifier", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
