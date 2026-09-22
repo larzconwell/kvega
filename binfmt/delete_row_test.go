@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"strings"
@@ -46,10 +45,10 @@ func TestWriteDeleteRow(t *testing.T) {
 	})
 }
 
-func TestReadDeleteRow(t *testing.T) {
+func TestDecoderDeleteRow(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from ReadString", func(t *testing.T) {
+	t.Run("returns error from String", func(t *testing.T) {
 		t.Parallel()
 
 		// Force error by writing invalid string length.
@@ -58,7 +57,9 @@ func TestReadDeleteRow(t *testing.T) {
 			buf.WriteByte(0xff)
 		}
 
-		key, n, err := ReadDeleteRow(bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		key, n, err := dec.DeleteRow()
+
 		assert.Empty(t, key)
 		assert.Equal(t, 10, n)
 		assert.ErrorIs(t, err, ErrReadIntInvalid)
@@ -77,7 +78,8 @@ func TestReadDeleteRow(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actualKey, n, err := ReadDeleteRow(reader)
+		dec := NewDecoder(reader)
+		actualKey, n, err := dec.DeleteRow()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 16, n)

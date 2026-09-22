@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -33,12 +32,11 @@ func (enc *Encoder) String(value string) error {
 	return nil
 }
 
-// ReadString reads a string from reader, first by reading the length in
-// bytes using ReadInt, followed by reading the bytes themselves.
-// ErrStringInvalid is returned when the bytes read contain invalid
-// UTF-8 runes.
-func ReadString(reader *bufio.Reader) (string, int, error) {
-	length, lenn, err := ReadInt[int64](reader)
+// String reads a string from the decoders reader. First by reading the length
+// using Int, followed by reading the bytes for the string. ErrStringInvalid
+// is returned when the bytes read contain invalid UTF-8 runes.
+func (dec *Decoder) String() (string, int, error) {
+	length, lenn, err := dec.Int()
 	if err != nil {
 		return "", lenn, fmt.Errorf("binfmt: failed to read string length: %w", err)
 	}
@@ -47,21 +45,29 @@ func ReadString(reader *bufio.Reader) (string, int, error) {
 		return "", lenn, nil
 	}
 
-	var buf bytes.Buffer
+	bytes := dec.getBuf(int(length))
 
-	n, err := io.CopyN(&buf, reader, length)
-	if errors.Is(err, io.EOF) {
-		err = io.ErrUnexpectedEOF
+	var n int
+	for n < len(bytes) {
+		nn, err := dec.reader.Read(bytes[n:])
+		n += nn
+
+		if errors.Is(err, io.EOF) {
+			if n >= len(bytes) {
+				break
+			}
+
+			err = io.ErrUnexpectedEOF
+		}
+
+		if err != nil {
+			return "", lenn + n, fmt.Errorf("binfmt: failed to read string: %w", err)
+		}
 	}
 
-	if err != nil {
-		return "", lenn + int(n), fmt.Errorf("binfmt: failed to read string: %w", err)
-	}
-
-	bytes := buf.Bytes()
 	if !utf8.Valid(bytes) {
-		return "", lenn + int(n), ErrStringInvalid
+		return "", lenn + n, ErrStringInvalid
 	}
 
-	return string(bytes), lenn + int(n), nil
+	return string(bytes), lenn + n, nil
 }

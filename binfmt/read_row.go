@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 )
@@ -13,11 +12,12 @@ var (
 	ErrRowValueIdentInvalid = errors.New("binfmt: row has invalid value identifier")
 )
 
-// ReadRowIdent reads a row identifier from the reader and returns it if it's
-// valid. If the row identifier is invalid ErrRowIdentInvalid is returned and
-// the read byte is unread causing this error to cycle.
-func ReadRowIdent(reader *bufio.Reader) (byte, error) {
-	ident, err := reader.ReadByte()
+// RowIdent reads a row identifier from the decoders reader and returns it.
+// If the row identifier is invalid, ErrRowIdentInvalid is returned and the
+// read byte is undread allowing for use later. io.EOF is returned if the
+// end of the decoders reader has been reached.
+func (dec *Decoder) RowIdent() (byte, error) {
+	ident, err := dec.reader.ReadByte()
 	if err != nil {
 		return 0, fmt.Errorf("binfmt: failed to read row identifier: %w", err)
 	}
@@ -29,7 +29,7 @@ func ReadRowIdent(reader *bufio.Reader) (byte, error) {
 		// The invalid ident error is more important to surface.
 		//nolint:errcheck
 		//gosec:disable G104
-		reader.UnreadByte()
+		dec.reader.UnreadByte()
 
 		return 0, ErrRowIdentInvalid
 	}

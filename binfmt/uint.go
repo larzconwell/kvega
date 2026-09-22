@@ -1,14 +1,11 @@
 package binfmt
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"math/bits"
 	"slices"
-
-	"golang.org/x/exp/constraints"
 )
 
 var (
@@ -67,26 +64,28 @@ func (enc *Encoder) Uint(value uint64) {
 	enc.Buffer.Write(bytes)
 }
 
-// ReadUint reads a big-endian variable length encoded uint from reader. It will read
-// bytes until it detects the end of the encoded uint, up to 10 bytes. The read uint
-// is parsed as a 64bit uint and returns ErrReadUintOverflow if the value is too large
-// to fit into T.
-func ReadUint[T constraints.Unsigned](reader *bufio.Reader) (T, int, error) {
+// Uint reads a big-endian variable length integer encoded value from the decoders
+// reader. It will read bytes until it detects the end of the encoded uint, up to
+// 10 bytes. If the read value overflows uint64 ErrReadUintOverflow is returned.
+func (dec *Decoder) Uint() (uint64, int, error) {
+	var n int
+
 	maxBytes := 10
-	bytes := make([]byte, 0, maxBytes)
+	bytes := dec.getBuf(maxBytes)
 
 	// Read up to the max bytes expected for an encoded uint.
 	for iter := range maxBytes {
-		value, err := reader.ReadByte()
+		value, err := dec.reader.ReadByte()
 		if errors.Is(err, io.EOF) {
 			err = io.ErrUnexpectedEOF
 		}
 
 		if err != nil {
-			return 0, len(bytes), fmt.Errorf("binfmt: failed to read uint: %w", err)
+			return 0, n, fmt.Errorf("binfmt: failed to read uint: %w", err)
 		}
 
-		bytes = append(bytes, value)
+		bytes[iter] = value
+		n++
 
 		if !continuationSet(value) {
 			break
@@ -94,8 +93,16 @@ func ReadUint[T constraints.Unsigned](reader *bufio.Reader) (T, int, error) {
 
 		// If the continuation is not set and we've reached maxBytes we have an invalid stream.
 		if iter >= maxBytes-1 {
-			return 0, len(bytes), ErrReadUintInvalid
+			return 0, n, ErrReadUintInvalid
 		}
+	}
+
+	// Detect overflow, for math.MaxUint64 the max bytes would've been read
+	// and the leading byte would only have the least significant bit and
+	// the continuation bit set. If the leading byte has anything more than
+	// the least significant bit set then the value would overflow uint64.
+	if n >= maxBytes && bytes[0]&0x7e > 0 {
+		return 0, n, ErrReadUintOverflow
 	}
 
 	var (
@@ -105,18 +112,16 @@ func ReadUint[T constraints.Unsigned](reader *bufio.Reader) (T, int, error) {
 
 	// Loop the bytes in little-endian order since we don't know how
 	// many shifts are required to build the original value.
-	for _, byt := range slices.Backward(bytes) {
+	for _, byt := range slices.Backward(bytes[:n]) {
 		value |= uint64(setContinuation(byt, false)) << shift
 		shift += 7
 	}
 
-	if value > uint64(T(0)-1) {
-		return 0, len(bytes), ErrReadUintOverflow
-	}
-
-	return T(value), len(bytes), nil
+	return value, n, nil
 }
 
+// setContinuation sets the most significant bit (the continuation
+// bit) in value if set is true, or unsets it if set is false.
 func setContinuation(value byte, set bool) byte {
 	if set {
 		return value | 0x80
@@ -125,6 +130,8 @@ func setContinuation(value byte, set bool) byte {
 	return value & 0x7f
 }
 
+// continuationSet returns true if the most significant bit
+// (the continuation bit) is set in value, false otherwise.
 func continuationSet(value byte) bool {
 	return value&0x80 == 0x80
 }

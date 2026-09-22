@@ -1,7 +1,6 @@
 package kvega
 
 import (
-	"bufio"
 	crypto "crypto/rand"
 	"errors"
 	"io"
@@ -487,7 +486,7 @@ func TestEmbeddedDBSet(t *testing.T) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		actualRows, err := readRows(edb, bufio.NewReader(file))
+		actualRows, err := readRows(edb, file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, []row{
@@ -498,7 +497,7 @@ func TestEmbeddedDBSet(t *testing.T) {
 			{
 				ident: binfmt.SetRowIdent,
 				key:   "key",
-				value: new([]byte("value")),
+				value: []byte("value"),
 			},
 		}, actualRows)
 	})
@@ -571,14 +570,14 @@ func TestEmbeddedDBDelete(t *testing.T) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		actualRows, err := readRows(edb, bufio.NewReader(file))
+		actualRows, err := readRows(edb, file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, []row{
 			{
 				ident: binfmt.SetRowIdent,
 				key:   "key",
-				value: new([]byte("value")),
+				value: []byte("value"),
 			},
 			{
 				ident: binfmt.DeleteRowIdent,
@@ -916,17 +915,25 @@ func TestEmbeddedDBGet(t *testing.T) {
 	})
 }
 
-func readRows(edb *EmbeddedDB, reader *bufio.Reader) ([]row, error) {
+func readRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
+	dec := binfmt.NewDecoder(reader)
 	rows := make([]row, 0, 2)
 
 	for {
-		row, _, err := edb.readRow(reader)
+		row, _, err := edb.readRow(dec)
 		if errors.Is(err, io.EOF) {
 			break
 		}
 
 		if err != nil {
 			return nil, err
+		}
+
+		// Copy value so it's not overwritten on next read row.
+		if row.value != nil {
+			value := make([]byte, len(row.value))
+			copy(value, row.value)
+			row.value = value
 		}
 
 		rows = append(rows, row)

@@ -1,12 +1,9 @@
 package binfmt
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"unsafe"
-
-	"golang.org/x/exp/constraints"
 )
 
 var (
@@ -26,7 +23,7 @@ var (
 // one. Positive values meanwhile become double their absolute value.
 //
 // After the int64 has been converted to a uint64, big-endian variable length
-// inger encoding is done, context to which can be gathered by reading Uint.
+// integer encoding is done, context to which can be gathered by reading Uint.
 func (enc *Encoder) Int(value int64) {
 	bitSize := unsafe.Sizeof(value) * 8
 
@@ -37,19 +34,17 @@ func (enc *Encoder) Int(value int64) {
 	enc.Uint(uValue)
 }
 
-// ReadInt reads a big-endian variable length encoded uint that contains a
-// zigzag encoded int. Once the uint has been read it is zigzag decoded to
-// convert it back to the appropriate int value. Up to 10 bytes are read
-// from reader.
-func ReadInt[T constraints.Signed](reader *bufio.Reader) (T, int, error) {
-	// Use uint64 since we have no clean way in Go to get an unsigned
-	// version of T without adding more type parameters.
-	uValue, n, err := ReadUint[uint64](reader)
+// Int decodes a zigzgag encoded value stored in a big-endian variable length integer
+// encoded value that's read from the decoders reader. Up to 10 bytes are read from
+// the decoders reader. If the decoded value overflows int64 ErrReadIntOverflow is
+// returned.
+func (dec *Decoder) Int() (int64, int, error) {
+	uValue, n, err := dec.Uint()
 	if errors.Is(err, ErrReadUintInvalid) {
 		return 0, n, ErrReadIntInvalid
-	}
-
-	if err != nil {
+	} else if errors.Is(err, ErrReadUintOverflow) {
+		return 0, n, ErrReadIntOverflow
+	} else if err != nil {
 		return 0, n, fmt.Errorf("binfmt: failed to read int: %w", errors.Unwrap(err))
 	}
 
@@ -58,12 +53,6 @@ func ReadInt[T constraints.Signed](reader *bufio.Reader) (T, int, error) {
 	// ensures the value will be within the signed range.
 	//gosec:disable G115
 	value := int64((uValue >> 1) ^ (-(uValue & 1)))
-	bitSize := unsafe.Sizeof(T(0)) * 8
-	maxT := T((1 << (bitSize - 1)) - 1)
 
-	if value > int64(maxT) {
-		return 0, n, ErrReadIntOverflow
-	}
-
-	return T(value), n, err
+	return value, n, err
 }

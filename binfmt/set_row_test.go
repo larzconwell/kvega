@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"strings"
@@ -58,10 +57,10 @@ func TestEncodeSetRow(t *testing.T) {
 	})
 }
 
-func TestReadSetRow(t *testing.T) {
+func TestDecoderSetRow(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from ReadString", func(t *testing.T) {
+	t.Run("returns error from String", func(t *testing.T) {
 		t.Parallel()
 
 		// Force error by writing invalid string length.
@@ -70,7 +69,9 @@ func TestReadSetRow(t *testing.T) {
 			buf.WriteByte(0xff)
 		}
 
-		key, value, n, err := ReadSetRow(bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		key, value, n, err := dec.SetRow()
+
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 10, n)
@@ -89,7 +90,9 @@ func TestReadSetRow(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		key, value, n, err := ReadSetRow(reader)
+		dec := NewDecoder(reader)
+		key, value, n, err := dec.SetRow()
+
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 4, n)
@@ -110,7 +113,9 @@ func TestReadSetRow(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		key, value, n, err := ReadSetRow(reader)
+		dec := NewDecoder(reader)
+		key, value, n, err := dec.SetRow()
+
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 5, n)
@@ -134,7 +139,9 @@ func TestReadSetRow(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		key, value, n, err := ReadSetRow(reader)
+		dec := NewDecoder(reader)
+		key, value, n, err := dec.SetRow()
+
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 4+1+10, n)
@@ -158,7 +165,8 @@ func TestReadSetRow(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actualKey, actualValue, n, err := ReadSetRow(reader)
+		dec := NewDecoder(reader)
+		actualKey, actualValue, n, err := dec.SetRow()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 16+1+4, n)

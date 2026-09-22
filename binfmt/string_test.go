@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"strings"
@@ -63,13 +62,15 @@ func TestEncoderString(t *testing.T) {
 	})
 }
 
-func TestReadString(t *testing.T) {
+func TestDecoderString(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns error from ReadInt", func(t *testing.T) {
 		t.Parallel()
 
-		value, n, err := ReadString(bufio.NewReader(&errReadWriter{err: io.ErrClosedPipe}))
+		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
+		value, n, err := dec.String()
+
 		assert.Empty(t, value)
 		assert.Zero(t, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -86,7 +87,9 @@ func TestReadString(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		value, n, err := ReadString(reader)
+		dec := NewDecoder(reader)
+		value, n, err := dec.String()
+
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -100,12 +103,13 @@ func TestReadString(t *testing.T) {
 		enc.Int(5)
 		enc.Buffer.Write(make([]byte, 5))
 
-		value, n, err := ReadString(bufio.NewReader(&errReadWriter{
+		dec := NewDecoder(&errReadWriter{
 			buf:   enc.Buffer,
 			err:   io.ErrClosedPipe,
 			errOn: 5,
-		}))
+		})
 
+		value, n, err := dec.String()
 		assert.Empty(t, value)
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -124,7 +128,9 @@ func TestReadString(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actual, n, err := ReadString(reader)
+		dec := NewDecoder(reader)
+		actual, n, err := dec.String()
+
 		assert.Empty(t, actual)
 		assert.Equal(t, len(value)+1, n)
 		assert.ErrorIs(t, err, ErrStringInvalid)
@@ -139,7 +145,8 @@ func TestReadString(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actual, n, err := ReadString(reader)
+		dec := NewDecoder(reader)
+		actual, n, err := dec.String()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -158,7 +165,8 @@ func TestReadString(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actual, n, err := ReadString(reader)
+		dec := NewDecoder(reader)
+		actual, n, err := dec.String()
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+1, n)

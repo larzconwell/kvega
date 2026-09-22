@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"math"
@@ -84,7 +83,7 @@ func TestEncoderUint(t *testing.T) {
 	})
 }
 
-func TestReadUint(t *testing.T) {
+func TestDecoderUint(t *testing.T) {
 	t.Parallel()
 
 	t.Run("return io.ErrUnexpectedEOF if encountering io.EOF before the last byte is read", func(t *testing.T) {
@@ -98,7 +97,9 @@ func TestReadUint(t *testing.T) {
 			// Expecting at least one more byte without continuation set.
 		})
 
-		value, n, err := ReadUint[uint64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
+
 		assert.Zero(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -107,13 +108,15 @@ func TestReadUint(t *testing.T) {
 	t.Run("return error if encountered error reading bytes", func(t *testing.T) {
 		t.Parallel()
 
-		value, n, err := ReadUint[uint64](bufio.NewReader(&errReadWriter{err: io.ErrClosedPipe}))
+		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
+		value, n, err := dec.Uint()
+
 		assert.Zero(t, value)
 		assert.Zero(t, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
 	})
 
-	t.Run("return error if reached ten byte cap without encounting unset continuation bit", func(t *testing.T) {
+	t.Run("return error if reached ten byte cap without encountering unset continuation bit", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -130,54 +133,68 @@ func TestReadUint(t *testing.T) {
 			0xff, // Should be 0b0111_1111 instead
 		})
 
-		value, n, err := ReadUint[uint64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
+
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
 		assert.ErrorIs(t, err, ErrReadUintInvalid)
 	})
 
-	t.Run("return error if read uint is larger than fits in given uint type", func(t *testing.T) {
+	t.Run("return error if read uint is larger than fits in uint64", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.Write([]byte{
-			0b1111_0111,
-			0b0011_1011,
+			0b1000_0010,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0,
 		})
 
-		value, n, err := ReadUint[uint8](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
+
 		assert.Zero(t, value)
-		assert.Equal(t, 2, n)
+		assert.Equal(t, 10, n)
 		assert.ErrorIs(t, err, ErrReadUintOverflow)
 	})
 
-	t.Run("reads zero encoded in one byte", func(t *testing.T) {
+	t.Run("decodes zero encoded in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.WriteByte(0)
 
-		value, n, err := ReadUint[uint](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
-		assert.Equal(t, uint(0), value)
+		assert.Equal(t, uint64(0), value)
 	})
 
-	t.Run("reads small uint encoded in one byte", func(t *testing.T) {
+	t.Run("decodes small uint encoded in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.WriteByte(0b0111_1111)
 
-		value, n, err := ReadUint[uint](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
-		assert.Equal(t, uint(127), value)
+		assert.Equal(t, uint64(127), value)
 	})
 
-	t.Run("reads medium uint encoded in three bytes", func(t *testing.T) {
+	t.Run("decodes medium uint encoded in three bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -187,14 +204,15 @@ func TestReadUint(t *testing.T) {
 			0b0011_1011,
 		})
 
-		value, n, err := ReadUint[uint](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 3, n)
-		assert.Equal(t, uint(0xbbbb), value)
+		assert.Equal(t, uint64(0xbbbb), value)
 	})
 
-	t.Run("reads large uint encoded in nine bytes", func(t *testing.T) {
+	t.Run("decodes large uint encoded in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -210,14 +228,15 @@ func TestReadUint(t *testing.T) {
 			0b0011_1011,
 		})
 
-		value, n, err := ReadUint[uint64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 9, n)
 		assert.Equal(t, uint64(0xbbb_bbbb_bbbb_bbbb), value)
 	})
 
-	t.Run("reads marg uint encoded in 10 bytes", func(t *testing.T) {
+	t.Run("decodes max uint encoded in 10 bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -234,7 +253,8 @@ func TestReadUint(t *testing.T) {
 			0b0111_1111,
 		})
 
-		value, n, err := ReadUint[uint64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Uint()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 10, n)

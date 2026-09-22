@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"fmt"
 )
 
@@ -22,11 +21,11 @@ func (enc *Encoder) DeleteRow(key string) error {
 	return nil
 }
 
-// ReadDeleteRow reads a delete row from reader, and expects that the row
-// identifier byte has already been read to determine the kind of row
-// to read.
-func ReadDeleteRow(reader *bufio.Reader) (string, int, error) {
-	key, keyn, err := ReadString(reader)
+// DeleteRow reads a delete row from the decoders reader, expecting
+// that the row identifier has already been read to determine that
+// the row is a delete row.
+func (dec *Decoder) DeleteRow() (string, int, error) {
+	key, keyn, err := dec.String()
 	if err != nil {
 		return "", keyn, fmt.Errorf("binfmt: failed to read key: %w", err)
 	}

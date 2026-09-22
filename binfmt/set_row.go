@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -27,17 +26,18 @@ func (enc *Encoder) SetRow(key string, value []byte) error {
 	return nil
 }
 
-// ReadSetRow reads a set row from reader, and expects that the row
-// identifier byte has already been read to determine the kind of row
-// to read. If the set row contains an invalid type,
+// SetRow reads a set row from the decoders reader, expecting that the row
+// identifier has already been read to determine that the row is a set row.
+// The returned value byte slice is only valid until the next call made to
+// the Decoder. If the set row contains an invalid value identifier,
 // ErrRowValueIdentInvalid is returned.
-func ReadSetRow(reader *bufio.Reader) (string, []byte, int, error) {
-	key, keyn, err := ReadString(reader)
+func (dec *Decoder) SetRow() (string, []byte, int, error) {
+	key, keyn, err := dec.String()
 	if err != nil {
 		return "", nil, keyn, fmt.Errorf("binfmt: failed to read key: %w", err)
 	}
 
-	valueIdent, err := reader.ReadByte()
+	valueIdent, err := dec.reader.ReadByte()
 	if errors.Is(err, io.EOF) {
 		err = io.ErrUnexpectedEOF
 	}
@@ -48,7 +48,7 @@ func ReadSetRow(reader *bufio.Reader) (string, []byte, int, error) {
 
 	switch valueIdent {
 	case BinaryIdent:
-		value, valuen, err := ReadBinary(reader)
+		value, valuen, err := dec.Binary()
 		if err != nil {
 			return "", nil, keyn + 1 + valuen, fmt.Errorf("binfmt: failed to read binary value: %w", err)
 		}

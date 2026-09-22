@@ -9,13 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestReadRowIdent(t *testing.T) {
+func TestDecoderRowIdent(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns error from reading byte", func(t *testing.T) {
 		t.Parallel()
 
-		ident, err := ReadRowIdent(bufio.NewReader(bytes.NewBuffer(nil)))
+		dec := NewDecoder(bytes.NewBuffer(nil))
+		ident, err := dec.RowIdent()
+
 		assert.Zero(t, ident)
 		assert.ErrorIs(t, err, io.EOF)
 		assert.ErrorContains(t, err, "read row identifier")
@@ -27,7 +29,8 @@ func TestReadRowIdent(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{'Z'})
 		reader := bufio.NewReader(buf)
 
-		ident, err := ReadRowIdent(reader)
+		dec := NewDecoder(reader)
+		ident, err := dec.RowIdent()
 		assert.Zero(t, ident)
 		assert.ErrorIs(t, err, ErrRowIdentInvalid)
 
@@ -42,7 +45,8 @@ func TestReadRowIdent(t *testing.T) {
 		buf := bytes.NewBuffer([]byte{SetRowIdent})
 		reader := bufio.NewReader(buf)
 
-		ident, err := ReadRowIdent(reader)
+		dec := NewDecoder(reader)
+		ident, err := dec.RowIdent()
 		assert.NoError(t, err)
 
 		assert.Equal(t, byte(SetRowIdent), ident)

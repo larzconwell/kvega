@@ -1,7 +1,6 @@
 package kvega
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -24,7 +23,7 @@ var (
 type row struct {
 	ident byte
 	key   string
-	value *[]byte
+	value []byte
 }
 
 // EmbeddedDB is an implementation of DB that provides access to a database backed by
@@ -217,20 +216,25 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 	var foundRow row
 
-	reader := bufio.NewReader(file)
+	decoder := binfmt.NewDecoder(file)
 
 	if foundOffset {
-		row, _, err := edb.readRow(reader)
+		row, _, err := edb.readRow(decoder)
 		if err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 
 		if row.key == key {
 			foundRow = row
+
+			// Copy the value only if we found a row.
+			value := make([]byte, len(foundRow.value))
+			copy(value, foundRow.value)
+			foundRow.value = value
 		}
 	} else {
 		for {
-			row, _, err := edb.readRow(reader)
+			row, _, err := edb.readRow(decoder)
 			if errors.Is(err, io.EOF) {
 				break
 			}
@@ -241,6 +245,11 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 			if row.key == key {
 				foundRow = row
+
+				// Copy the value only if we found a row.
+				value := make([]byte, len(foundRow.value))
+				copy(value, foundRow.value)
+				foundRow.value = value
 			}
 		}
 	}
@@ -251,7 +260,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 	switch foundRow.ident {
 	case binfmt.SetRowIdent:
-		return *foundRow.value, nil
+		return foundRow.value, nil
 	case binfmt.DeleteRowIdent:
 		return nil, ErrNotFound
 	default:
@@ -293,8 +302,8 @@ func (edb *EmbeddedDB) writeRow(encode func(enc *binfmt.Encoder) (string, error)
 
 // readRow reads one row from the reader, returning io.EOF
 // if we've reached the end of the file.
-func (edb *EmbeddedDB) readRow(reader *bufio.Reader) (row, int, error) {
-	rowIdent, err := binfmt.ReadRowIdent(reader)
+func (edb *EmbeddedDB) readRow(dec *binfmt.Decoder) (row, int, error) {
+	rowIdent, err := dec.RowIdent()
 	if errors.Is(err, io.EOF) {
 		return row{}, 0, io.EOF
 	}
@@ -305,7 +314,7 @@ func (edb *EmbeddedDB) readRow(reader *bufio.Reader) (row, int, error) {
 
 	switch rowIdent {
 	case binfmt.SetRowIdent:
-		key, value, n, err := binfmt.ReadSetRow(reader)
+		key, value, n, err := dec.SetRow()
 		if err != nil {
 			return row{}, 1 + n, fmt.Errorf("kvega: failed to read set row: %w", err)
 		}
@@ -313,10 +322,10 @@ func (edb *EmbeddedDB) readRow(reader *bufio.Reader) (row, int, error) {
 		return row{
 			ident: binfmt.SetRowIdent,
 			key:   key,
-			value: &value,
+			value: value,
 		}, 1 + n, nil
 	case binfmt.DeleteRowIdent:
-		key, n, err := binfmt.ReadDeleteRow(reader)
+		key, n, err := dec.DeleteRow()
 		if err != nil {
 			return row{}, 1 + n, fmt.Errorf("kvega: failed to read delete row: %w", err)
 		}
@@ -345,10 +354,10 @@ func (edb *EmbeddedDB) buildIndex() error {
 	var offset int64
 
 	index := make(map[string]int64)
-	reader := bufio.NewReader(file)
+	decoder := binfmt.NewDecoder(file)
 
 	for {
-		row, n, err := edb.readRow(reader)
+		row, n, err := edb.readRow(decoder)
 		if errors.Is(err, io.EOF) {
 			break
 		}

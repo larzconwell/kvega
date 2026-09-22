@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -25,28 +24,38 @@ func (enc *Encoder) Binary(value []byte) {
 	enc.Buffer = new(bytes.Buffer)
 }
 
-// ReadBinary reads a slice from reader, first by reading the length
-// using ReadInt, followed by reading the actual bytes themselves.
-func ReadBinary(reader *bufio.Reader) ([]byte, int, error) {
-	length, lenn, err := ReadInt[int64](reader)
+// Binary reads arbitrary bytes from the decoders reader. First by reading the
+// length using Int, followed by reading the actual bytes. The returned byte
+// slice is only valid until the next call made to the Decoder.
+func (dec *Decoder) Binary() ([]byte, int, error) {
+	length, lenn, err := dec.Int()
 	if err != nil {
 		return nil, lenn, fmt.Errorf("binfmt: failed to read binary length: %w", err)
 	}
 
 	if length == 0 {
-		return make([]byte, 0), lenn, nil
+		return dec.buffer[:0], lenn, nil
 	}
 
-	var buf bytes.Buffer
+	bytes := dec.getBuf(int(length))
 
-	n, err := io.CopyN(&buf, reader, length)
-	if errors.Is(err, io.EOF) {
-		err = io.ErrUnexpectedEOF
+	var n int
+	for n < len(bytes) {
+		nn, err := dec.reader.Read(bytes[n:])
+		n += nn
+
+		if errors.Is(err, io.EOF) {
+			if n >= len(bytes) {
+				break
+			}
+
+			err = io.ErrUnexpectedEOF
+		}
+
+		if err != nil {
+			return nil, lenn + n, fmt.Errorf("binfmt: failed to read binary: %w", err)
+		}
 	}
 
-	if err != nil {
-		return nil, lenn + int(n), fmt.Errorf("binfmt: failed to read binary: %w", err)
-	}
-
-	return buf.Bytes(), lenn + int(n), nil
+	return bytes, lenn + n, nil
 }

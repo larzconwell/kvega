@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"math"
@@ -104,7 +103,7 @@ func TestEncoderInt(t *testing.T) {
 		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("encodes minimum int in ten bytes", func(t *testing.T) {
+	t.Run("encodes min int in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
@@ -124,7 +123,7 @@ func TestEncoderInt(t *testing.T) {
 		}, enc.Buffer.Bytes())
 	})
 
-	t.Run("encodes maximum int in ten bytes", func(t *testing.T) {
+	t.Run("encodes max int in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
@@ -145,7 +144,7 @@ func TestEncoderInt(t *testing.T) {
 	})
 }
 
-func TestReadInt(t *testing.T) {
+func TestDecoderInt(t *testing.T) {
 	t.Parallel()
 
 	t.Run("return io.ErrUnexpectedEOF if encountering io.EOF before the last byte is read", func(t *testing.T) {
@@ -159,7 +158,9 @@ func TestReadInt(t *testing.T) {
 			// Expecting at least one more byte without continuation set.
 		})
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
+
 		assert.Zero(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -168,13 +169,15 @@ func TestReadInt(t *testing.T) {
 	t.Run("return error if encountered error reading bytes", func(t *testing.T) {
 		t.Parallel()
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&errReadWriter{err: io.ErrClosedPipe}))
+		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
+		value, n, err := dec.Int()
+
 		assert.Zero(t, value)
 		assert.Zero(t, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
 	})
 
-	t.Run("return error if reached ten byte cap without encounting unset continuation bit", func(t *testing.T) {
+	t.Run("return error if reached ten byte cap without encountering unset continuation bit", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -191,68 +194,82 @@ func TestReadInt(t *testing.T) {
 			0xff, // Should be 0b0111_1111 instead
 		})
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
+
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
 		assert.ErrorIs(t, err, ErrReadIntInvalid)
 	})
 
-	t.Run("return error if read int is larger than fits in given int type", func(t *testing.T) {
+	t.Run("return error if read int is larger than fits in int64", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.Write([]byte{
-			0b1000_0101,
-			0b1110_1110,
-			0b0111_0110,
+			0b1000_0010,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0b1000_0000,
+			0,
 		})
 
-		value, n, err := ReadInt[int8](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
+
 		assert.Zero(t, value)
-		assert.Equal(t, 3, n)
+		assert.Equal(t, 10, n)
 		assert.ErrorIs(t, err, ErrReadIntOverflow)
 	})
 
-	t.Run("reads zero zigzag encoded int in one byte", func(t *testing.T) {
+	t.Run("decodes zero zigzag encoded int in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.WriteByte(0)
 
-		value, n, err := ReadInt[int](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
-		assert.Equal(t, 0, value)
+		assert.Equal(t, int64(0), value)
 	})
 
-	t.Run("reads small positive zigzag encoded int in one byte", func(t *testing.T) {
+	t.Run("decodes small positive zigzag encoded int in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.WriteByte(0b0110_0100)
 
-		value, n, err := ReadInt[int](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
-		assert.Equal(t, 50, value)
+		assert.Equal(t, int64(50), value)
 	})
 
-	t.Run("reads small negative zigzag encoded int in one byte", func(t *testing.T) {
+	t.Run("decodes small negative zigzag encoded int in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
 		buf.WriteByte(0b0110_0011)
 
-		value, n, err := ReadInt[int](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
-		assert.Equal(t, -50, value)
+		assert.Equal(t, int64(-50), value)
 	})
 
-	t.Run("reads medium positive zigzag encoded int in three bytes", func(t *testing.T) {
+	t.Run("decodes medium positive zigzag encoded int in three bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -262,14 +279,15 @@ func TestReadInt(t *testing.T) {
 			0b0111_0110,
 		})
 
-		value, n, err := ReadInt[int](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 3, n)
-		assert.Equal(t, 48_059, value)
+		assert.Equal(t, int64(48_059), value)
 	})
 
-	t.Run("reads medium negative zigzag encoded int in three bytes", func(t *testing.T) {
+	t.Run("decodes medium negative zigzag encoded int in three bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -279,14 +297,15 @@ func TestReadInt(t *testing.T) {
 			0b0111_0101,
 		})
 
-		value, n, err := ReadInt[int](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 3, n)
-		assert.Equal(t, -48_059, value)
+		assert.Equal(t, int64(-48_059), value)
 	})
 
-	t.Run("reads large positive zigzag encoded int in nine bytes", func(t *testing.T) {
+	t.Run("decodes large positive zigzag encoded int in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -302,14 +321,15 @@ func TestReadInt(t *testing.T) {
 			0b0111_0110,
 		})
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 9, n)
 		assert.Equal(t, int64(845_475_770_045_021_115), value)
 	})
 
-	t.Run("reads large negative zigzag encoded int in nine bytes", func(t *testing.T) {
+	t.Run("decodes large negative zigzag encoded int in nine bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -325,14 +345,15 @@ func TestReadInt(t *testing.T) {
 			0b01110101,
 		})
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 9, n)
 		assert.Equal(t, int64(-845_475_770_045_021_115), value)
 	})
 
-	t.Run("writes minimum zigzag encoded int in ten bytes", func(t *testing.T) {
+	t.Run("decodes min zigzag encoded int in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -349,14 +370,15 @@ func TestReadInt(t *testing.T) {
 			0b01111111,
 		})
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 10, n)
 		assert.Equal(t, int64(math.MinInt64), value)
 	})
 
-	t.Run("writes maximum zigzag encoded int in ten bytes", func(t *testing.T) {
+	t.Run("decodes max zigzag encoded int in ten bytes", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -373,7 +395,8 @@ func TestReadInt(t *testing.T) {
 			0b01111110,
 		})
 
-		value, n, err := ReadInt[int64](bufio.NewReader(&buf))
+		dec := NewDecoder(&buf)
+		value, n, err := dec.Int()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 10, n)

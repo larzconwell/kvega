@@ -1,7 +1,6 @@
 package binfmt
 
 import (
-	"bufio"
 	"bytes"
 	"io"
 	"testing"
@@ -56,13 +55,15 @@ func TestEncoderBinary(t *testing.T) {
 	})
 }
 
-func TestReadBinary(t *testing.T) {
+func TestDecoderBinary(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from ReadInt", func(t *testing.T) {
+	t.Run("returns error from Int", func(t *testing.T) {
 		t.Parallel()
 
-		value, n, err := ReadBinary(bufio.NewReader(&errReadWriter{err: io.ErrClosedPipe}))
+		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
+		value, n, err := dec.Binary()
+
 		assert.Empty(t, value)
 		assert.Zero(t, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -79,7 +80,9 @@ func TestReadBinary(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		value, n, err := ReadBinary(reader)
+		dec := NewDecoder(reader)
+		value, n, err := dec.Binary()
+
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
@@ -93,12 +96,13 @@ func TestReadBinary(t *testing.T) {
 		enc.Int(5)
 		enc.Buffer.Write(make([]byte, 5))
 
-		value, n, err := ReadBinary(bufio.NewReader(&errReadWriter{
+		dec := NewDecoder(&errReadWriter{
 			buf:   enc.Buffer,
 			err:   io.ErrClosedPipe,
 			errOn: 5,
-		}))
+		})
 
+		value, n, err := dec.Binary()
 		assert.Empty(t, value)
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -114,7 +118,8 @@ func TestReadBinary(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actual, n, err := ReadBinary(reader)
+		dec := NewDecoder(reader)
+		actual, n, err := dec.Binary()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -136,7 +141,8 @@ func TestReadBinary(t *testing.T) {
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
-		actual, n, err := ReadBinary(reader)
+		dec := NewDecoder(reader)
+		actual, n, err := dec.Binary()
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+2, n)
