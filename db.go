@@ -53,7 +53,7 @@ type DB interface {
 // The returned DB is safe for concurrent use by multiple goroutines, and as a result
 // should only require one call.
 //
-// The returned DB should be closed when finished to ensure caches are flushed.
+// The returned DB should be closed when finished to ensure caches are synced.
 //
 //nolint:ireturn
 func OpenDB(location string) (DB, error) {

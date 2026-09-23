@@ -227,7 +227,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		if row.key == key {
 			foundRow = row
 
-			// Copy the value only if we found a row.
+			// Copy the value only if a row matching the key was found.
 			value := make([]byte, len(foundRow.value))
 			copy(value, foundRow.value)
 			foundRow.value = value
@@ -246,7 +246,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 			if row.key == key {
 				foundRow = row
 
-				// Copy the value only if we found a row.
+				// Copy the value only if a row matching the key was found.
 				value := make([]byte, len(foundRow.value))
 				copy(value, foundRow.value)
 				foundRow.value = value
@@ -301,7 +301,7 @@ func (edb *EmbeddedDB) writeRow(encode func(enc *binfmt.Encoder) (string, error)
 }
 
 // readRow reads one row from the reader, returning io.EOF
-// if we've reached the end of the file.
+// if the end of the file has been reached.
 func (edb *EmbeddedDB) readRow(dec *binfmt.Decoder) (row, int, error) {
 	rowIdent, err := dec.RowIdent()
 	if errors.Is(err, io.EOF) {

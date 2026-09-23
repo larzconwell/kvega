@@ -21,8 +21,8 @@ func urlToFSPath(path string) string {
 	parts := strings.Split(path, "/")
 	fsPath := strings.Join(parts, string(filepath.Separator))
 
-	// Strip leading / (now \ since we've replaced / with \)
-	// if url path contains volume name.
+	// Strip leading / (now \ as / was replaced with \ in previous
+	// step) if url path contains volume name.
 	if fsPath != "" && filepath.VolumeName(fsPath[1:]) != "" {
 		fsPath = fsPath[1:]
 	}

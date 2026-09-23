@@ -29,7 +29,7 @@ description = "Benchmark code"
 run = "go test -skip '(Test|Fuzz).*' -count 6 -benchmem -bench . ./..."
 
 [tasks.benchstat]
-description = "Compute statitics for benchmark results"
+description = "Compute statistics for benchmark results"
 run = "go tool benchstat"
 
 [tasks.lint]

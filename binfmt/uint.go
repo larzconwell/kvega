@@ -91,7 +91,7 @@ func (dec *Decoder) Uint() (uint64, int, error) {
 			break
 		}
 
-		// If the continuation is not set and we've reached maxBytes we have an invalid stream.
+		// If the continuation is not set and maxBytes have been reached the stream is invalid.
 		if iter >= maxBytes-1 {
 			return 0, n, ErrReadUintInvalid
 		}
@@ -110,8 +110,8 @@ func (dec *Decoder) Uint() (uint64, int, error) {
 		shift uint
 	)
 
-	// Loop the bytes in little-endian order since we don't know how
-	// many shifts are required to build the original value.
+	// Loop the bytes in little-endian order since the number of
+	// shifts required to build the original value is unknown.
 	for _, byt := range slices.Backward(bytes[:n]) {
 		value |= uint64(setContinuation(byt, false)) << shift
 		shift += 7
