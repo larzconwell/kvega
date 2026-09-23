@@ -138,10 +138,10 @@ func TestDecoderUint(t *testing.T) {
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
-		assert.ErrorIs(t, err, ErrReadUintInvalid)
+		assert.ErrorIs(t, err, ErrDecodeUintInvalid)
 	})
 
-	t.Run("return error if read uint is larger than fits in uint64", func(t *testing.T) {
+	t.Run("return error if decoded uint is larger than fits in uint64", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -163,7 +163,7 @@ func TestDecoderUint(t *testing.T) {
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
-		assert.ErrorIs(t, err, ErrReadUintOverflow)
+		assert.ErrorIs(t, err, ErrDecodeUintOverflow)
 	})
 
 	t.Run("decodes zero encoded in one byte", func(t *testing.T) {

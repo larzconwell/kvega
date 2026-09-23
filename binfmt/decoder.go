@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-// Decoder is used to efficiently decode and read row
+// Decoder is used to efficiently read and decode row
 // data from a reader.
 type Decoder struct {
 	reader *bufio.Reader

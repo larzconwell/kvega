@@ -12,7 +12,7 @@ import (
 func TestDecoderRowIdent(t *testing.T) {
 	t.Parallel()
 
-	t.Run("returns error from reading byte", func(t *testing.T) {
+	t.Run("returns error from decoding byte", func(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(bytes.NewBuffer(nil))
@@ -20,10 +20,10 @@ func TestDecoderRowIdent(t *testing.T) {
 
 		assert.Zero(t, ident)
 		assert.ErrorIs(t, err, io.EOF)
-		assert.ErrorContains(t, err, "read row identifier")
+		assert.ErrorContains(t, err, "decode row identifier")
 	})
 
-	t.Run("returns ErrRowIdentInvalid if read identifier is invalid and unreads the byte", func(t *testing.T) {
+	t.Run("returns ErrRowIdentInvalid if decoded identifier is invalid and unreads the byte", func(t *testing.T) {
 		t.Parallel()
 
 		buf := bytes.NewBuffer([]byte{'Z'})

@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestWriteDeleteRow(t *testing.T) {
+func TestEncoderDeleteRow(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns error from encoding key", func(t *testing.T) {
@@ -62,8 +62,8 @@ func TestDecoderDeleteRow(t *testing.T) {
 
 		assert.Empty(t, key)
 		assert.Equal(t, 10, n)
-		assert.ErrorIs(t, err, ErrReadIntInvalid)
-		assert.ErrorContains(t, err, "read key")
+		assert.ErrorIs(t, err, ErrDecodeIntInvalid)
+		assert.ErrorContains(t, err, "decode key")
 	})
 
 	t.Run("returns the key", func(t *testing.T) {

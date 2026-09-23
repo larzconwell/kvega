@@ -32,13 +32,13 @@ func (enc *Encoder) String(value string) error {
 	return nil
 }
 
-// String reads a string from the decoders reader. First by reading the length
+// String decodes a string from the decoders reader. First by reading the length
 // using Int, followed by reading the bytes for the string. ErrStringInvalid
-// is returned when the bytes read contain invalid UTF-8 runes.
+// is returned when the bytes decoded contain invalid UTF-8 runes.
 func (dec *Decoder) String() (string, int, error) {
 	length, lenn, err := dec.Int()
 	if err != nil {
-		return "", lenn, fmt.Errorf("binfmt: failed to read string length: %w", err)
+		return "", lenn, fmt.Errorf("binfmt: failed to decode string length: %w", err)
 	}
 
 	if length == 0 {
@@ -61,7 +61,7 @@ func (dec *Decoder) String() (string, int, error) {
 		}
 
 		if err != nil {
-			return "", lenn + n, fmt.Errorf("binfmt: failed to read string: %w", err)
+			return "", lenn + n, fmt.Errorf("binfmt: failed to decode string: %w", err)
 		}
 	}
 

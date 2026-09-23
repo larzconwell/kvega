@@ -24,13 +24,13 @@ func (enc *Encoder) Binary(value []byte) {
 	enc.Buffer = new(bytes.Buffer)
 }
 
-// Binary reads arbitrary bytes from the decoders reader. First by reading the
+// Binary decodes arbitrary bytes from the decoders reader. First by reading the
 // length using Int, followed by reading the actual bytes. The returned byte
 // slice is only valid until the next call made to the Decoder.
 func (dec *Decoder) Binary() ([]byte, int, error) {
 	length, lenn, err := dec.Int()
 	if err != nil {
-		return nil, lenn, fmt.Errorf("binfmt: failed to read binary length: %w", err)
+		return nil, lenn, fmt.Errorf("binfmt: failed to decode binary length: %w", err)
 	}
 
 	if length == 0 {
@@ -53,7 +53,7 @@ func (dec *Decoder) Binary() ([]byte, int, error) {
 		}
 
 		if err != nil {
-			return nil, lenn + n, fmt.Errorf("binfmt: failed to read binary: %w", err)
+			return nil, lenn + n, fmt.Errorf("binfmt: failed to decode binary: %w", err)
 		}
 	}
 

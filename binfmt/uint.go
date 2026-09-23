@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	// ErrReadUintInvalid is returned when a uint cannot be read due to invalid reader data.
-	ErrReadUintInvalid = errors.New("binfmt: read uint failed due to invalid reader data")
-	// ErrReadUintOverflow is returned when a read uint is larger uint64.
-	ErrReadUintOverflow = errors.New("binfmt: read uint does not fit in uint64")
+	// ErrDecodeUintInvalid is returned when a uint cannot be decoded due to invalid reader data.
+	ErrDecodeUintInvalid = errors.New("binfmt: decode uint failed due to invalid reader data")
+	// ErrDecodeUintOverflow is returned when a decoded uint is larger uint64.
+	ErrDecodeUintOverflow = errors.New("binfmt: decoded uint does not fit in uint64")
 )
 
 // Uint encodes value using big-endian variable length integer encoding and adds it to the
@@ -64,9 +64,9 @@ func (enc *Encoder) Uint(value uint64) {
 	enc.Buffer.Write(bytes)
 }
 
-// Uint reads a big-endian variable length integer encoded value from the decoders
+// Uint decodes a big-endian variable length integer encoded value from the decoders
 // reader. It will read bytes until it detects the end of the encoded uint, up to
-// 10 bytes. If the read value overflows uint64 ErrReadUintOverflow is returned.
+// 10 bytes. If the decoded value overflows uint64 ErrDecodeUintOverflow is returned.
 func (dec *Decoder) Uint() (uint64, int, error) {
 	var n int
 
@@ -81,7 +81,7 @@ func (dec *Decoder) Uint() (uint64, int, error) {
 		}
 
 		if err != nil {
-			return 0, n, fmt.Errorf("binfmt: failed to read uint: %w", err)
+			return 0, n, fmt.Errorf("binfmt: failed to decode uint: %w", err)
 		}
 
 		bytes[iter] = value
@@ -93,7 +93,7 @@ func (dec *Decoder) Uint() (uint64, int, error) {
 
 		// If the continuation is not set and maxBytes have been reached the stream is invalid.
 		if iter >= maxBytes-1 {
-			return 0, n, ErrReadUintInvalid
+			return 0, n, ErrDecodeUintInvalid
 		}
 	}
 
@@ -102,7 +102,7 @@ func (dec *Decoder) Uint() (uint64, int, error) {
 	// the continuation bit set. If the leading byte has anything more than
 	// the least significant bit set then the value would overflow uint64.
 	if n >= maxBytes && bytes[0]&0x7e > 0 {
-		return 0, n, ErrReadUintOverflow
+		return 0, n, ErrDecodeUintOverflow
 	}
 
 	var (

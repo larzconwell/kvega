@@ -75,11 +75,11 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 10, n)
-		assert.ErrorIs(t, err, ErrReadIntInvalid)
-		assert.ErrorContains(t, err, "read key")
+		assert.ErrorIs(t, err, ErrDecodeIntInvalid)
+		assert.ErrorContains(t, err, "decode key")
 	})
 
-	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF while reading value identifier", func(t *testing.T) {
+	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF while decoding value identifier", func(t *testing.T) {
 		t.Parallel()
 
 		// Force error by omitting the value identifier and value.
@@ -97,10 +97,10 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.Nil(t, value)
 		assert.Equal(t, 4, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-		assert.ErrorContains(t, err, "read value type identifier")
+		assert.ErrorContains(t, err, "decode value type identifier")
 	})
 
-	t.Run("return ErrRowValueIdentInvalid if read an invalid value identifier", func(t *testing.T) {
+	t.Run("return ErrRowValueIdentInvalid if decoded an invalid value identifier", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
@@ -145,8 +145,8 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 4+1+10, n)
-		assert.ErrorIs(t, err, ErrReadIntInvalid)
-		assert.ErrorContains(t, err, "read binary value")
+		assert.ErrorIs(t, err, ErrDecodeIntInvalid)
+		assert.ErrorContains(t, err, "decode binary value")
 	})
 
 	t.Run("returns the key and binary value", func(t *testing.T) {

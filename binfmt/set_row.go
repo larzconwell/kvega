@@ -26,15 +26,15 @@ func (enc *Encoder) SetRow(key string, value []byte) error {
 	return nil
 }
 
-// SetRow reads a set row from the decoders reader, expecting that the row
-// identifier has already been read to determine that the row is a set row.
+// SetRow decodes a set row from the decoders reader, expecting that the row
+// identifier has already been decoded to determine that the row is a set row.
 // The returned value byte slice is only valid until the next call made to
 // the Decoder. If the set row contains an invalid value type identifier,
 // ErrRowValueIdentInvalid is returned.
 func (dec *Decoder) SetRow() (string, []byte, int, error) {
 	key, keyn, err := dec.String()
 	if err != nil {
-		return "", nil, keyn, fmt.Errorf("binfmt: failed to read key: %w", err)
+		return "", nil, keyn, fmt.Errorf("binfmt: failed to decode key: %w", err)
 	}
 
 	valueIdent, err := dec.reader.ReadByte()
@@ -43,14 +43,14 @@ func (dec *Decoder) SetRow() (string, []byte, int, error) {
 	}
 
 	if err != nil {
-		return "", nil, keyn, fmt.Errorf("binfmt: failed to read value type identifier: %w", err)
+		return "", nil, keyn, fmt.Errorf("binfmt: failed to decode value type identifier: %w", err)
 	}
 
 	switch valueIdent {
 	case BinaryIdent:
 		value, valuen, err := dec.Binary()
 		if err != nil {
-			return "", nil, keyn + 1 + valuen, fmt.Errorf("binfmt: failed to read binary value: %w", err)
+			return "", nil, keyn + 1 + valuen, fmt.Errorf("binfmt: failed to decode binary value: %w", err)
 		}
 
 		return key, value, keyn + 1 + valuen, nil

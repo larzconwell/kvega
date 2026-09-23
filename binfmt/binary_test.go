@@ -67,7 +67,7 @@ func TestDecoderBinary(t *testing.T) {
 		assert.Empty(t, value)
 		assert.Zero(t, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "read int")
+		assert.ErrorContains(t, err, "decode int")
 	})
 
 	t.Run("returns io.ErrUnexpectedEOF if encountered io.EOF before the value has been completely read", func(t *testing.T) {
@@ -86,10 +86,10 @@ func TestDecoderBinary(t *testing.T) {
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
 		assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-		assert.ErrorContains(t, err, "read binary")
+		assert.ErrorContains(t, err, "decode binary")
 	})
 
-	t.Run("returns error from reading value", func(t *testing.T) {
+	t.Run("returns error from decoding value", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
@@ -106,10 +106,10 @@ func TestDecoderBinary(t *testing.T) {
 		assert.Empty(t, value)
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
-		assert.ErrorContains(t, err, "read binary")
+		assert.ErrorContains(t, err, "decode binary")
 	})
 
-	t.Run("returns empty binary from reader", func(t *testing.T) {
+	t.Run("returns empty binary from decoder", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
@@ -126,7 +126,7 @@ func TestDecoderBinary(t *testing.T) {
 		assert.Equal(t, make([]byte, 0), actual)
 	})
 
-	t.Run("returns the read value", func(t *testing.T) {
+	t.Run("returns the decoded value", func(t *testing.T) {
 		t.Parallel()
 
 		value := make([]byte, 128)

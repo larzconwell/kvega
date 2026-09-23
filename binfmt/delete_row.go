@@ -21,13 +21,13 @@ func (enc *Encoder) DeleteRow(key string) error {
 	return nil
 }
 
-// DeleteRow reads a delete row from the decoders reader, expecting
-// that the row identifier has already been read to determine that
+// DeleteRow decodes a delete row from the decoders reader, expecting
+// that the row identifier has already been decoded to determine that
 // the row is a delete row.
 func (dec *Decoder) DeleteRow() (string, int, error) {
 	key, keyn, err := dec.String()
 	if err != nil {
-		return "", keyn, fmt.Errorf("binfmt: failed to read key: %w", err)
+		return "", keyn, fmt.Errorf("binfmt: failed to decode key: %w", err)
 	}
 
 	return key, keyn, nil

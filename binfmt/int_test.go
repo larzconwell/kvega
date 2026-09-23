@@ -199,10 +199,10 @@ func TestDecoderInt(t *testing.T) {
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
-		assert.ErrorIs(t, err, ErrReadIntInvalid)
+		assert.ErrorIs(t, err, ErrDecodeIntInvalid)
 	})
 
-	t.Run("return error if read int is larger than fits in int64", func(t *testing.T) {
+	t.Run("return error if decoded int is larger than fits in int64", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -224,7 +224,7 @@ func TestDecoderInt(t *testing.T) {
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
-		assert.ErrorIs(t, err, ErrReadIntOverflow)
+		assert.ErrorIs(t, err, ErrDecodeIntOverflow)
 	})
 
 	t.Run("decodes zero zigzag encoded int in one byte", func(t *testing.T) {

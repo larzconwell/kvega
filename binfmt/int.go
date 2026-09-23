@@ -7,10 +7,10 @@ import (
 )
 
 var (
-	// ErrReadIntInvalid is returned when an int cannot be read due to invalid reader data.
-	ErrReadIntInvalid = errors.New("binfmt: read int failed due to invalid reader data")
-	// ErrReadIntOverflow is returned when a read int is larger than int64.
-	ErrReadIntOverflow = errors.New("binfmt: read int does not fit in int64")
+	// ErrDecodeIntInvalid is returned when an int cannot be decoded due to invalid reader data.
+	ErrDecodeIntInvalid = errors.New("binfmt: decode int failed due to invalid reader data")
+	// ErrDecodeIntOverflow is returned when a decoded int is larger than int64.
+	ErrDecodeIntOverflow = errors.New("binfmt: decoded int does not fit in int64")
 )
 
 // Int encodes value using zigzag encoding along with big-endian variable length integer
@@ -36,16 +36,16 @@ func (enc *Encoder) Int(value int64) {
 
 // Int decodes a zigzgag encoded value stored in a big-endian variable length integer
 // encoded value that's read from the decoders reader. Up to 10 bytes are read from
-// the decoders reader. If the decoded value overflows int64 ErrReadIntOverflow is
+// the decoders reader. If the decoded value overflows int64 ErrDecodeIntOverflow is
 // returned.
 func (dec *Decoder) Int() (int64, int, error) {
 	uValue, n, err := dec.Uint()
-	if errors.Is(err, ErrReadUintInvalid) {
-		return 0, n, ErrReadIntInvalid
-	} else if errors.Is(err, ErrReadUintOverflow) {
-		return 0, n, ErrReadIntOverflow
+	if errors.Is(err, ErrDecodeUintInvalid) {
+		return 0, n, ErrDecodeIntInvalid
+	} else if errors.Is(err, ErrDecodeUintOverflow) {
+		return 0, n, ErrDecodeIntOverflow
 	} else if err != nil {
-		return 0, n, fmt.Errorf("binfmt: failed to read int: %w", errors.Unwrap(err))
+		return 0, n, fmt.Errorf("binfmt: failed to decode int: %w", errors.Unwrap(err))
 	}
 
 	// This theoretical overflow is fine, the conversion will lead
