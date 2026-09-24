@@ -11,14 +11,14 @@ import (
 func TestBinaryIdent(t *testing.T) {
 	t.Parallel()
 
-	var vtBinary = Binary{}
+	var vtBinary Binary
 	assert.Equal(t, byte('B'), vtBinary.Ident())
 }
 
 func TestEncoderBinary(t *testing.T) {
 	t.Parallel()
 
-	var vtBinary = Binary{}
+	var vtBinary Binary
 
 	t.Run("encodes empty binary", func(t *testing.T) {
 		t.Parallel()
@@ -70,8 +70,8 @@ func TestDecoderBinary(t *testing.T) {
 	t.Parallel()
 
 	var (
-		vtInt    = Int{}
-		vtBinary = Binary{}
+		vtInt    Int
+		vtBinary Binary
 	)
 
 	t.Run("returns error from Int", func(t *testing.T) {

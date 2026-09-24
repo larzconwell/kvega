@@ -43,7 +43,7 @@ func (Int) Encode(enc *Encoder, value int64) error {
 	//gosec:disable G115
 	uValue := (uint64(value) << 1) ^ uint64(value>>(bitSize-1))
 
-	var vtUint = Uint{}
+	var vtUint Uint
 
 	// Encoding uint does not return error.
 	//nolint:errcheck
@@ -58,7 +58,7 @@ func (Int) Encode(enc *Encoder, value int64) error {
 // the decoders reader. If the decoded value overflows int64 ErrDecodeIntOverflow is
 // returned.
 func (Int) Decode(dec *Decoder) (int64, int, error) {
-	var vtUint = Uint{}
+	var vtUint Uint
 
 	uValue, n, err := vtUint.Decode(dec)
 	if errors.Is(err, ErrDecodeUintInvalid) {

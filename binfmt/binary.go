@@ -24,7 +24,7 @@ func (Binary) Ident() byte {
 // a new empty current buffer for further writes. value may contain any
 // byte including NUL.
 func (Binary) Encode(enc *Encoder, value []byte) error {
-	var vtInt = Int{}
+	var vtInt Int
 
 	// Encoding int does not return error.
 	//nolint:errcheck
@@ -41,7 +41,7 @@ func (Binary) Encode(enc *Encoder, value []byte) error {
 // length using Int, followed by reading the actual bytes. The returned byte
 // slice is only valid until the next call made to the Decoder.
 func (Binary) Decode(dec *Decoder) ([]byte, int, error) {
-	var vtInt = Int{}
+	var vtInt Int
 
 	length, lenn, err := vtInt.Decode(dec)
 	if err != nil {

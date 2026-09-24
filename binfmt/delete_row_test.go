@@ -72,7 +72,7 @@ func TestDecoderDeleteRow(t *testing.T) {
 		key := "こんにちは"
 		enc := NewEncoder()
 
-		var vtString = String{}
+		var vtString String
 
 		err := vtString.Encode(enc, key)
 		assert.NoError(t, err)

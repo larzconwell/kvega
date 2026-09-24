@@ -12,14 +12,14 @@ import (
 func TestIntIdent(t *testing.T) {
 	t.Parallel()
 
-	var vtInt = Int{}
+	var vtInt Int
 	assert.Equal(t, byte('I'), vtInt.Ident())
 }
 
 func TestIntEncode(t *testing.T) {
 	t.Parallel()
 
-	var vtInt = Int{}
+	var vtInt Int
 
 	t.Run("encodes zero in one byte", func(t *testing.T) {
 		t.Parallel()
@@ -165,7 +165,7 @@ func TestIntEncode(t *testing.T) {
 func TestIntDecode(t *testing.T) {
 	t.Parallel()
 
-	var vtInt = Int{}
+	var vtInt Int
 
 	t.Run("return io.ErrUnexpectedEOF if encountering io.EOF before the last byte is read", func(t *testing.T) {
 		t.Parallel()

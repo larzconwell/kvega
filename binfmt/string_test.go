@@ -12,14 +12,14 @@ import (
 func TestStringIdent(t *testing.T) {
 	t.Parallel()
 
-	var vtString = String{}
+	var vtString String
 	assert.Equal(t, byte('S'), vtString.Ident())
 }
 
 func TestStringEncode(t *testing.T) {
 	t.Parallel()
 
-	var vtString = String{}
+	var vtString String
 
 	t.Run("returns ErrStringInvalid when string is not valid UTF-8", func(t *testing.T) {
 		t.Parallel()
@@ -75,8 +75,8 @@ func TestStringDecode(t *testing.T) {
 	t.Parallel()
 
 	var (
-		vtInt    = Int{}
-		vtString = String{}
+		vtInt    Int
+		vtString String
 	)
 
 	t.Run("returns error from Int", func(t *testing.T) {

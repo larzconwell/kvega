@@ -44,7 +44,7 @@ func TestEncoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(key), buf)
 
-		var vtUint = Uint{}
+		var vtUint Uint
 
 		assert.Equal(t, []byte{
 			vtUint.Ident(),
@@ -75,7 +75,7 @@ func TestEncoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(key), buf)
 
-		var vtInt = Int{}
+		var vtInt Int
 
 		assert.Equal(t, []byte{
 			vtInt.Ident(),
@@ -106,7 +106,7 @@ func TestEncoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(key), buf)
 
-		var vtBinary = Binary{}
+		var vtBinary Binary
 
 		//nolint:forcetypeassert
 		assert.Equal(t, []byte{
@@ -142,7 +142,7 @@ func TestEncoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(key), buf)
 
-		var vtString = String{}
+		var vtString String
 
 		//nolint:forcetypeassert
 		assert.Equal(t, []byte{
@@ -160,9 +160,7 @@ func TestEncoderSetRow(t *testing.T) {
 func TestDecoderSetRow(t *testing.T) {
 	t.Parallel()
 
-	var (
-		vtString = String{}
-	)
+	var vtString String
 
 	t.Run("returns error from String", func(t *testing.T) {
 		t.Parallel()
@@ -233,7 +231,7 @@ func TestDecoderSetRow(t *testing.T) {
 		err := vtString.Encode(enc, "key")
 		assert.NoError(t, err)
 
-		var vtBinary = Binary{}
+		var vtBinary Binary
 		enc.Buffer.WriteByte(vtBinary.Ident())
 
 		// Force error by writing invalid binary length.
@@ -320,7 +318,7 @@ func TestDecoderSetRow(t *testing.T) {
 		err := vtString.Encode(enc, key)
 		assert.NoError(t, err)
 
-		var vtBinary = Binary{}
+		var vtBinary Binary
 		enc.Buffer.WriteByte(vtBinary.Ident())
 		err = vtBinary.Encode(enc, value)
 
@@ -347,7 +345,7 @@ func TestDecoderSetRow(t *testing.T) {
 		err := vtString.Encode(enc, key)
 		assert.NoError(t, err)
 
-		var vtString = String{}
+		var vtString String
 		enc.Buffer.WriteByte(vtString.Ident())
 		err = vtString.Encode(enc, key)
 

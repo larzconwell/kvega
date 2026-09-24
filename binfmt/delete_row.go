@@ -13,7 +13,7 @@ const (
 func (enc *Encoder) DeleteRow(key string) error {
 	enc.Buffer.WriteByte(DeleteRowIdent)
 
-	var vtString = String{}
+	var vtString String
 
 	err := vtString.Encode(enc, key)
 	if err != nil {
@@ -27,7 +27,7 @@ func (enc *Encoder) DeleteRow(key string) error {
 // that the row identifier has already been decoded to determine that
 // the row is a delete row.
 func (dec *Decoder) DeleteRow() (string, int, error) {
-	var vtString = String{}
+	var vtString String
 
 	key, keyn, err := vtString.Decode(dec)
 	if err != nil {

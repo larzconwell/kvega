@@ -35,7 +35,7 @@ func (String) Encode(enc *Encoder, value string) error {
 		return ErrStringInvalid
 	}
 
-	var vtInt = Int{}
+	var vtInt Int
 
 	// Encoding int does not return error.
 	//nolint:errcheck
@@ -52,7 +52,7 @@ func (String) Encode(enc *Encoder, value string) error {
 // using Int, followed by reading the bytes for the string. ErrStringInvalid
 // is returned when the bytes decoded contain invalid UTF-8 runes.
 func (String) Decode(dec *Decoder) (string, int, error) {
-	var vtInt = Int{}
+	var vtInt Int
 
 	length, lenn, err := vtInt.Decode(dec)
 	if err != nil {

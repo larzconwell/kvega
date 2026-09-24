@@ -15,7 +15,7 @@ const (
 func (enc *Encoder) SetRow[T ValueType[V], V any](key string, value V) error {
 	enc.Buffer.WriteByte(SetRowIdent)
 
-	var vtString = String{}
+	var vtString String
 
 	err := vtString.Encode(enc, key)
 	if err != nil {
@@ -42,7 +42,7 @@ func (dec *Decoder) SetRow[T ValueType[V], V any]() (string, V, int, error) {
 	var (
 		t        T
 		v        V
-		vtString = String{}
+		vtString String
 	)
 
 	key, keyn, err := vtString.Decode(dec)
