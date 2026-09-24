@@ -12,16 +12,23 @@ const (
 )
 
 // SetRow encodes a set row with key and value adding it to the encoder.
-func (enc *Encoder) SetRow(key string, value []byte) error {
+func (enc *Encoder) SetRow[T ValueType[V], V any](key string, value V) error {
 	enc.Buffer.WriteByte(SetRowIdent)
 
-	err := enc.String(key)
+	var vtString = String{}
+
+	err := vtString.Encode(enc, key)
 	if err != nil {
 		return fmt.Errorf("binfmt: failed to encode key: %w", err)
 	}
 
-	enc.Buffer.WriteByte(BinaryIdent)
-	enc.Binary(value)
+	var t T
+	enc.Buffer.WriteByte(t.Ident())
+
+	err = t.Encode(enc, value)
+	if err != nil {
+		return fmt.Errorf("binfmt: failed to encode value: %w", err)
+	}
 
 	return nil
 }
@@ -31,10 +38,16 @@ func (enc *Encoder) SetRow(key string, value []byte) error {
 // The returned value byte slice is only valid until the next call made to
 // the Decoder. If the set row contains an invalid value type identifier,
 // ErrRowValueIdentInvalid is returned.
-func (dec *Decoder) SetRow() (string, []byte, int, error) {
-	key, keyn, err := dec.String()
+func (dec *Decoder) SetRow[T ValueType[V], V any]() (string, V, int, error) {
+	var (
+		t        T
+		v        V
+		vtString = String{}
+	)
+
+	key, keyn, err := vtString.Decode(dec)
 	if err != nil {
-		return "", nil, keyn, fmt.Errorf("binfmt: failed to decode key: %w", err)
+		return "", v, keyn, fmt.Errorf("binfmt: failed to decode key: %w", err)
 	}
 
 	valueIdent, err := dec.reader.ReadByte()
@@ -43,18 +56,17 @@ func (dec *Decoder) SetRow() (string, []byte, int, error) {
 	}
 
 	if err != nil {
-		return "", nil, keyn, fmt.Errorf("binfmt: failed to decode value type identifier: %w", err)
+		return "", v, keyn, fmt.Errorf("binfmt: failed to decode value type identifier: %w", err)
 	}
 
-	switch valueIdent {
-	case BinaryIdent:
-		value, valuen, err := dec.Binary()
-		if err != nil {
-			return "", nil, keyn + 1 + valuen, fmt.Errorf("binfmt: failed to decode binary value: %w", err)
-		}
-
-		return key, value, keyn + 1 + valuen, nil
-	default:
-		return "", nil, keyn + 1, ErrRowValueIdentInvalid
+	if valueIdent != t.Ident() {
+		return "", v, keyn + 1, ErrRowValueIdentInvalid
 	}
+
+	v, n, err := t.Decode(dec)
+	if err != nil {
+		return "", v, keyn + 1 + n, fmt.Errorf("binfmt: failed to decode value: %w", err)
+	}
+
+	return key, v, keyn + 1 + n, nil
 }

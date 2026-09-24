@@ -9,14 +9,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEncoderUint(t *testing.T) {
+func TestUintIdent(t *testing.T) {
 	t.Parallel()
+
+	var vtUint = Uint{}
+	assert.Equal(t, byte('U'), vtUint.Ident())
+}
+
+func TestUintEncode(t *testing.T) {
+	t.Parallel()
+
+	var vtUint = Uint{}
 
 	t.Run("encodes zero in one byte", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Uint(0)
+		err := vtUint.Encode(enc, 0)
+		assert.NoError(t, err)
 
 		assert.Equal(t, []byte{0}, enc.Buffer.Bytes())
 	})
@@ -25,7 +35,8 @@ func TestEncoderUint(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Uint(127)
+		err := vtUint.Encode(enc, 127)
+		assert.NoError(t, err)
 
 		assert.Equal(t, []byte{0b0111_1111}, enc.Buffer.Bytes())
 	})
@@ -34,7 +45,8 @@ func TestEncoderUint(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Uint(0xbbbb)
+		err := vtUint.Encode(enc, 0xbbbb)
+		assert.NoError(t, err)
 
 		assert.Equal(t, []byte{
 			0b1000_0010,
@@ -47,7 +59,8 @@ func TestEncoderUint(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Uint(0xbbb_bbbb_bbbb_bbbb)
+		err := vtUint.Encode(enc, 0xbbb_bbbb_bbbb_bbbb)
+		assert.NoError(t, err)
 
 		assert.Equal(t, []byte{
 			0b1000_1011,
@@ -66,7 +79,8 @@ func TestEncoderUint(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Uint(math.MaxUint64)
+		err := vtUint.Encode(enc, math.MaxUint64)
+		assert.NoError(t, err)
 
 		assert.Equal(t, []byte{
 			0b1000_0001,
@@ -83,8 +97,10 @@ func TestEncoderUint(t *testing.T) {
 	})
 }
 
-func TestDecoderUint(t *testing.T) {
+func TestUintDecode(t *testing.T) {
 	t.Parallel()
+
+	var vtUint = Uint{}
 
 	t.Run("return io.ErrUnexpectedEOF if encountering io.EOF before the last byte is read", func(t *testing.T) {
 		t.Parallel()
@@ -98,7 +114,7 @@ func TestDecoderUint(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 
 		assert.Zero(t, value)
 		assert.Equal(t, 3, n)
@@ -109,7 +125,7 @@ func TestDecoderUint(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 
 		assert.Zero(t, value)
 		assert.Zero(t, n)
@@ -134,7 +150,7 @@ func TestDecoderUint(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
@@ -159,7 +175,7 @@ func TestDecoderUint(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
@@ -173,7 +189,7 @@ func TestDecoderUint(t *testing.T) {
 		buf.WriteByte(0)
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -187,7 +203,7 @@ func TestDecoderUint(t *testing.T) {
 		buf.WriteByte(0b0111_1111)
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -205,7 +221,7 @@ func TestDecoderUint(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 3, n)
@@ -229,7 +245,7 @@ func TestDecoderUint(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 9, n)
@@ -254,7 +270,7 @@ func TestDecoderUint(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := dec.Uint()
+		value, n, err := vtUint.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 10, n)

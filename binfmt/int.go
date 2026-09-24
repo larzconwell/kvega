@@ -13,7 +13,18 @@ var (
 	ErrDecodeIntOverflow = errors.New("binfmt: decoded int does not fit in int64")
 )
 
-// Int encodes value using zigzag encoding along with big-endian variable length integer
+var _ ValueType[int64] = Int{}
+
+// Int implements ValueType[int64] and is able
+// to encode and decode int64 values.
+type Int struct{}
+
+// Ident returns the Int identifier.
+func (Int) Ident() byte {
+	return 'I'
+}
+
+// Encode encodes value using zigzag encoding along with big-endian variable length integer
 // encoding and adds it to the encoder. 1 to 10 bytes may be added to the encoder
 // depending on the value.
 //
@@ -23,23 +34,33 @@ var (
 // one. Positive values meanwhile become double their absolute value.
 //
 // After the int64 has been converted to a uint64, big-endian variable length
-// integer encoding is done, context to which can be gathered by reading Uint.
-func (enc *Encoder) Int(value int64) {
+// integer encoding is done, context to which can be gathered by reading Uint.Encode.
+func (Int) Encode(enc *Encoder, value int64) error {
 	bitSize := unsafe.Sizeof(value) * 8
 
 	// This overflow is fine, tests validate the behavior when
 	// encoding math.MinInt64 and math.MaxInt64.
 	//gosec:disable G115
 	uValue := (uint64(value) << 1) ^ uint64(value>>(bitSize-1))
-	enc.Uint(uValue)
+
+	var vtUint = Uint{}
+
+	// Encoding uint does not return error.
+	//nolint:errcheck
+	//gosec:disable G104
+	vtUint.Encode(enc, uValue)
+
+	return nil
 }
 
-// Int decodes a zigzgag encoded value stored in a big-endian variable length integer
+// Decode decodes a zigzgag encoded value stored in a big-endian variable length integer
 // encoded value that's read from the decoders reader. Up to 10 bytes are read from
 // the decoders reader. If the decoded value overflows int64 ErrDecodeIntOverflow is
 // returned.
-func (dec *Decoder) Int() (int64, int, error) {
-	uValue, n, err := dec.Uint()
+func (Int) Decode(dec *Decoder) (int64, int, error) {
+	var vtUint = Uint{}
+
+	uValue, n, err := vtUint.Decode(dec)
 	if errors.Is(err, ErrDecodeUintInvalid) {
 		return 0, n, ErrDecodeIntInvalid
 	} else if errors.Is(err, ErrDecodeUintOverflow) {
@@ -54,5 +75,5 @@ func (dec *Decoder) Int() (int64, int, error) {
 	//gosec:disable G115
 	value := int64((uValue >> 1) ^ (-(uValue & 1)))
 
-	return value, n, err
+	return value, n, nil
 }

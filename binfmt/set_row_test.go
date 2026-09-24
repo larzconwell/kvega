@@ -9,14 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEncodeSetRow(t *testing.T) {
+func TestEncoderSetRow(t *testing.T) {
 	t.Parallel()
 
 	t.Run("returns error from encoding key", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		err := enc.SetRow(string([]byte{0xff, 0xfe, 0xfd}), []byte("value"))
+		err := enc.SetRow[Binary](string([]byte{0xff, 0xfe, 0xfd}), []byte("value"))
 		assert.ErrorIs(t, err, ErrStringInvalid)
 		assert.ErrorContains(t, err, "encode key")
 	})
@@ -28,7 +28,7 @@ func TestEncodeSetRow(t *testing.T) {
 		value := []byte{0xff, 0xfe, 0xfd}
 		enc := NewEncoder()
 
-		err := enc.SetRow(key, value)
+		err := enc.SetRow[Binary](key, value)
 		assert.NoError(t, err)
 
 		assert.Len(t, enc.writes, 4)
@@ -44,9 +44,11 @@ func TestEncodeSetRow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte(key), buf)
 
+		var vtBinary = Binary{}
+
 		//nolint:forcetypeassert
 		assert.Equal(t, []byte{
-			BinaryIdent,
+			vtBinary.Ident(),
 			0b0000_0110,
 		}, enc.writes[2].(*bytes.Buffer).Bytes())
 
@@ -60,6 +62,11 @@ func TestEncodeSetRow(t *testing.T) {
 func TestDecoderSetRow(t *testing.T) {
 	t.Parallel()
 
+	var (
+		vtBinary = Binary{}
+		vtString = String{}
+	)
+
 	t.Run("returns error from String", func(t *testing.T) {
 		t.Parallel()
 
@@ -70,7 +77,7 @@ func TestDecoderSetRow(t *testing.T) {
 		}
 
 		dec := NewDecoder(&buf)
-		key, value, n, err := dec.SetRow()
+		key, value, n, err := dec.SetRow[Binary]()
 
 		assert.Empty(t, key)
 		assert.Nil(t, value)
@@ -84,14 +91,14 @@ func TestDecoderSetRow(t *testing.T) {
 
 		// Force error by omitting the value identifier and value.
 		enc := NewEncoder()
-		err := enc.String("key")
+		err := vtString.Encode(enc, "key")
 		assert.NoError(t, err)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		key, value, n, err := dec.SetRow()
+		key, value, n, err := dec.SetRow[Binary]()
 
 		assert.Empty(t, key)
 		assert.Nil(t, value)
@@ -104,7 +111,7 @@ func TestDecoderSetRow(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		err := enc.String("key")
+		err := vtString.Encode(enc, "key")
 		assert.NoError(t, err)
 
 		// Force error by writing invalid value identifier.
@@ -114,7 +121,7 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		key, value, n, err := dec.SetRow()
+		key, value, n, err := dec.SetRow[Binary]()
 
 		assert.Empty(t, key)
 		assert.Nil(t, value)
@@ -126,10 +133,10 @@ func TestDecoderSetRow(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		err := enc.String("key")
+		err := vtString.Encode(enc, "key")
 		assert.NoError(t, err)
 
-		enc.Buffer.WriteByte(BinaryIdent)
+		enc.Buffer.WriteByte(vtBinary.Ident())
 
 		// Force error by writing invalid binary length.
 		for range 10 {
@@ -140,13 +147,13 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		key, value, n, err := dec.SetRow()
+		key, value, n, err := dec.SetRow[Binary]()
 
 		assert.Empty(t, key)
 		assert.Nil(t, value)
 		assert.Equal(t, 4+1+10, n)
 		assert.ErrorIs(t, err, ErrDecodeIntInvalid)
-		assert.ErrorContains(t, err, "decode binary value")
+		assert.ErrorContains(t, err, "decode value")
 	})
 
 	t.Run("returns the key and binary value", func(t *testing.T) {
@@ -156,17 +163,19 @@ func TestDecoderSetRow(t *testing.T) {
 		value := []byte{0xff, 0xfe, 0xfd}
 		enc := NewEncoder()
 
-		err := enc.String(key)
+		err := vtString.Encode(enc, key)
 		assert.NoError(t, err)
 
-		enc.Buffer.WriteByte(BinaryIdent)
-		enc.Binary(value)
+		enc.Buffer.WriteByte(vtBinary.Ident())
+		err = vtBinary.Encode(enc, value)
+
+		assert.NoError(t, err)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actualKey, actualValue, n, err := dec.SetRow()
+		actualKey, actualValue, n, err := dec.SetRow[Binary]()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 16+1+4, n)

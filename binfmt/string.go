@@ -14,17 +14,33 @@ var (
 	ErrStringInvalid = errors.New("binfmt: string contains invalid data")
 )
 
-// String encodes value by adding its length to the encoders current buffer
+var _ ValueType[string] = String{}
+
+// String implements ValueType[string] and is able to
+// encode and decode string values.
+type String struct{}
+
+// Ident returns the String identifier.
+func (String) Ident() byte {
+	return 'S'
+}
+
+// Encode encodes value by adding its length to the encoders current buffer
 // and then moves the current buffer to the writes list, followed by adding
 // value to the writes list, it finally creates a new empty current buffer
 // for further writes. ErrStringInvalid is returned when value is not
 // valid UTF-8.
-func (enc *Encoder) String(value string) error {
+func (String) Encode(enc *Encoder, value string) error {
 	if !utf8.ValidString(value) {
 		return ErrStringInvalid
 	}
 
-	enc.Int(int64(len(value)))
+	var vtInt = Int{}
+
+	// Encoding int does not return error.
+	//nolint:errcheck
+	//gosec:disable G104
+	vtInt.Encode(enc, int64(len(value)))
 
 	enc.writes = append(enc.writes, enc.Buffer, strings.NewReader(value))
 	enc.Buffer = new(bytes.Buffer)
@@ -32,11 +48,13 @@ func (enc *Encoder) String(value string) error {
 	return nil
 }
 
-// String decodes a string from the decoders reader. First by reading the length
+// Decode decodes a string from the decoders reader. First by reading the length
 // using Int, followed by reading the bytes for the string. ErrStringInvalid
 // is returned when the bytes decoded contain invalid UTF-8 runes.
-func (dec *Decoder) String() (string, int, error) {
-	length, lenn, err := dec.Int()
+func (String) Decode(dec *Decoder) (string, int, error) {
+	var vtInt = Int{}
+
+	length, lenn, err := vtInt.Decode(dec)
 	if err != nil {
 		return "", lenn, fmt.Errorf("binfmt: failed to decode string length: %w", err)
 	}

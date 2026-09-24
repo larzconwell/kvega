@@ -163,7 +163,7 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 	}
 
 	return edb.writeRow(func(enc *binfmt.Encoder) (string, error) {
-		return key, enc.SetRow(key, value)
+		return key, enc.SetRow[binfmt.Binary](key, value)
 	})
 }
 
@@ -314,7 +314,7 @@ func (edb *EmbeddedDB) readRow(dec *binfmt.Decoder) (row, int, error) {
 
 	switch rowIdent {
 	case binfmt.SetRowIdent:
-		key, value, n, err := dec.SetRow()
+		key, value, n, err := dec.SetRow[binfmt.Binary]()
 		if err != nil {
 			return row{}, 1 + n, fmt.Errorf("kvega: failed to read set row: %w", err)
 		}

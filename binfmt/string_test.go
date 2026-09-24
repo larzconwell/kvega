@@ -9,14 +9,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEncoderString(t *testing.T) {
+func TestStringIdent(t *testing.T) {
 	t.Parallel()
+
+	var vtString = String{}
+	assert.Equal(t, byte('S'), vtString.Ident())
+}
+
+func TestStringEncode(t *testing.T) {
+	t.Parallel()
+
+	var vtString = String{}
 
 	t.Run("returns ErrStringInvalid when string is not valid UTF-8", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		err := enc.String(string([]byte{0xff, 0xfe, 0xfd}))
+		err := vtString.Encode(enc, string([]byte{0xff, 0xfe, 0xfd}))
 		assert.ErrorIs(t, err, ErrStringInvalid)
 	})
 
@@ -24,7 +33,7 @@ func TestEncoderString(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		err := enc.String("")
+		err := vtString.Encode(enc, "")
 		assert.NoError(t, err)
 
 		assert.Len(t, enc.writes, 2)
@@ -43,7 +52,7 @@ func TestEncoderString(t *testing.T) {
 		value := "Cześć, こんにちは, 你好"
 		enc := NewEncoder()
 
-		err := enc.String(value)
+		err := vtString.Encode(enc, value)
 		assert.NoError(t, err)
 
 		assert.Len(t, enc.writes, 2)
@@ -62,14 +71,19 @@ func TestEncoderString(t *testing.T) {
 	})
 }
 
-func TestDecoderString(t *testing.T) {
+func TestStringDecode(t *testing.T) {
 	t.Parallel()
+
+	var (
+		vtInt    = Int{}
+		vtString = String{}
+	)
 
 	t.Run("returns error from Int", func(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
-		value, n, err := dec.String()
+		value, n, err := vtString.Decode(dec)
 
 		assert.Empty(t, value)
 		assert.Zero(t, n)
@@ -81,14 +95,16 @@ func TestDecoderString(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Int(5)
+		err := vtInt.Encode(enc, 5)
+		assert.NoError(t, err)
+
 		enc.Buffer.Write(make([]byte, 2))
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		value, n, err := dec.String()
+		value, n, err := vtString.Decode(dec)
 
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
@@ -100,7 +116,9 @@ func TestDecoderString(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Int(5)
+		err := vtInt.Encode(enc, 5)
+		assert.NoError(t, err)
+
 		enc.Buffer.Write(make([]byte, 5))
 
 		dec := NewDecoder(&errReadWriter{
@@ -109,7 +127,7 @@ func TestDecoderString(t *testing.T) {
 			errOn: 5,
 		})
 
-		value, n, err := dec.String()
+		value, n, err := vtString.Decode(dec)
 		assert.Empty(t, value)
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -122,14 +140,16 @@ func TestDecoderString(t *testing.T) {
 		value := []byte{0xff, 0xfe, 0xfd}
 
 		enc := NewEncoder()
-		enc.Int(int64(len(value)))
+		err := vtInt.Encode(enc, int64(len(value)))
+		assert.NoError(t, err)
+
 		enc.Buffer.Write(value)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := dec.String()
+		actual, n, err := vtString.Decode(dec)
 
 		assert.Empty(t, actual)
 		assert.Equal(t, len(value)+1, n)
@@ -140,13 +160,14 @@ func TestDecoderString(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Int(0)
+		err := vtInt.Encode(enc, 0)
+		assert.NoError(t, err)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := dec.String()
+		actual, n, err := vtString.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -159,14 +180,16 @@ func TestDecoderString(t *testing.T) {
 		value := "Cześć, こんにちは, 你好"
 		enc := NewEncoder()
 
-		enc.Int(int64(len(value)))
+		err := vtInt.Encode(enc, int64(len(value)))
+		assert.NoError(t, err)
+
 		enc.Buffer.WriteString(value)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := dec.String()
+		actual, n, err := vtString.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+1, n)

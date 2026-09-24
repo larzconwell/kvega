@@ -8,14 +8,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestBinaryIdent(t *testing.T) {
+	t.Parallel()
+
+	var vtBinary = Binary{}
+	assert.Equal(t, byte('B'), vtBinary.Ident())
+}
+
 func TestEncoderBinary(t *testing.T) {
 	t.Parallel()
+
+	var vtBinary = Binary{}
 
 	t.Run("encodes empty binary", func(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Binary(nil)
+		err := vtBinary.Encode(enc, nil)
+		assert.NoError(t, err)
 
 		assert.Len(t, enc.writes, 2)
 		assert.NotNil(t, enc.Buffer)
@@ -36,7 +46,8 @@ func TestEncoderBinary(t *testing.T) {
 		}
 
 		enc := NewEncoder()
-		enc.Binary(value)
+		err := vtBinary.Encode(enc, value)
+		assert.NoError(t, err)
 
 		assert.Len(t, enc.writes, 2)
 		assert.NotNil(t, enc.Buffer)
@@ -58,11 +69,16 @@ func TestEncoderBinary(t *testing.T) {
 func TestDecoderBinary(t *testing.T) {
 	t.Parallel()
 
+	var (
+		vtInt    = Int{}
+		vtBinary = Binary{}
+	)
+
 	t.Run("returns error from Int", func(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
-		value, n, err := dec.Binary()
+		value, n, err := vtBinary.Decode(dec)
 
 		assert.Empty(t, value)
 		assert.Zero(t, n)
@@ -74,14 +90,16 @@ func TestDecoderBinary(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Int(5)
+		err := vtInt.Encode(enc, 5)
+		assert.NoError(t, err)
+
 		enc.Buffer.Write(make([]byte, 2))
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		value, n, err := dec.Binary()
+		value, n, err := vtBinary.Decode(dec)
 
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
@@ -93,7 +111,9 @@ func TestDecoderBinary(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Int(5)
+		err := vtInt.Encode(enc, 5)
+		assert.NoError(t, err)
+
 		enc.Buffer.Write(make([]byte, 5))
 
 		dec := NewDecoder(&errReadWriter{
@@ -102,7 +122,7 @@ func TestDecoderBinary(t *testing.T) {
 			errOn: 5,
 		})
 
-		value, n, err := dec.Binary()
+		value, n, err := vtBinary.Decode(dec)
 		assert.Empty(t, value)
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -113,13 +133,14 @@ func TestDecoderBinary(t *testing.T) {
 		t.Parallel()
 
 		enc := NewEncoder()
-		enc.Int(0)
+		err := vtInt.Encode(enc, 0)
+		assert.NoError(t, err)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := dec.Binary()
+		actual, n, err := vtBinary.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -135,14 +156,16 @@ func TestDecoderBinary(t *testing.T) {
 		}
 
 		enc := NewEncoder()
-		enc.Int(int64(len(value)))
+		err := vtInt.Encode(enc, int64(len(value)))
+		assert.NoError(t, err)
+
 		enc.Buffer.Write(value)
 
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := dec.Binary()
+		actual, n, err := vtBinary.Decode(dec)
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+2, n)

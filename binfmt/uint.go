@@ -15,13 +15,24 @@ var (
 	ErrDecodeUintOverflow = errors.New("binfmt: decoded uint does not fit in uint64")
 )
 
-// Uint encodes value using big-endian variable length integer encoding and adds it to the
+var _ ValueType[uint64] = Uint{}
+
+// Uint implements ValueType[uint64] and is able to
+// encode and decode uint64 values.
+type Uint struct{}
+
+// Ident returns the Uint identifier.
+func (Uint) Ident() byte {
+	return 'U'
+}
+
+// Encode encodes value using big-endian variable length integer encoding and adds it to the
 // encoder. 1 to 10 bytes may be added to the encoder depending on the value.
 //
 // Variable length integer encoding works by splitting value into 7 bit chunks, where the
 // 7 bits of value data are located in the least significant portion of a byte, the most
 // significant bit in the chunk being reserved as a continuation bit to signal that more
-// bytes should be read. Uint splits the value up and orders the resulting bytes in
+// bytes should be read. Encode splits the value up and orders the resulting bytes in
 // big-endian order.
 //
 // Here is an example of how a uint would be encoded. Given a value 0x108a, the following
@@ -31,7 +42,7 @@ var (
 // [___10000] [10001010] - Binary representation of value 0x108a.
 // [__100001] [_0001010] - Splitting value into 7 bit chunks.
 // [10100001] [00001010] - Adding continuation bits to the 7 bit chunks.
-func (enc *Encoder) Uint(value uint64) {
+func (Uint) Encode(enc *Encoder, value uint64) error {
 	// Determine number of bytes required to store encoded value.
 	msbidx := bits.Len64(value)
 	byteSize := 7
@@ -62,12 +73,14 @@ func (enc *Encoder) Uint(value uint64) {
 
 	bytes[idx] = setContinuation(byte(value), !last)
 	enc.Buffer.Write(bytes)
+
+	return nil
 }
 
-// Uint decodes a big-endian variable length integer encoded value from the decoders
+// Decode decodes a big-endian variable length integer encoded value from the decoders
 // reader. It will read bytes until it detects the end of the encoded uint, up to
 // 10 bytes. If the decoded value overflows uint64 ErrDecodeUintOverflow is returned.
-func (dec *Decoder) Uint() (uint64, int, error) {
+func (Uint) Decode(dec *Decoder) (uint64, int, error) {
 	var n int
 
 	maxBytes := 10

@@ -757,7 +757,9 @@ func TestEmbeddedDBGet(t *testing.T) {
 			enc := binfmt.NewEncoder()
 			enc.Buffer.WriteByte(binfmt.SetRowIdent)
 
-			err = enc.String("key")
+			var vtString binfmt.String
+
+			err = vtString.Encode(enc, "key")
 			assert.NoError(t, err)
 
 			_, err = enc.WriteTo(edb.writer)
@@ -831,10 +833,14 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
+			var vtInt binfmt.Int
+
 			// Force error by only writing row identifier and the length portion of the key.
 			enc := binfmt.NewEncoder()
 			enc.Buffer.WriteByte(binfmt.DeleteRowIdent)
-			enc.Int(5)
+
+			err = vtInt.Encode(enc, 5)
+			assert.NoError(t, err)
 
 			_, err = enc.WriteTo(edb.writer)
 			assert.NoError(t, err)

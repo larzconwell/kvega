@@ -7,28 +7,43 @@ import (
 	"io"
 )
 
-const (
-	// BinaryIdent is the value type identifier for a binary value.
-	BinaryIdent = 'B'
-)
+var _ ValueType[[]byte] = Binary{}
 
-// Binary encodes value by adding its length to the encoders current buffer
+// Binary implements ValueType[[]byte] and is able to
+// encode and decode []byte values.
+type Binary struct{}
+
+// Ident returns the Binary identifier.
+func (Binary) Ident() byte {
+	return 'B'
+}
+
+// Encode encodes value by adding its length to the encoders current buffer
 // and then moves the current buffer to the writes list, followed by adding
 // value to the writes list without a copy of value, it finally creates
 // a new empty current buffer for further writes. value may contain any
 // byte including NUL.
-func (enc *Encoder) Binary(value []byte) {
-	enc.Int(int64(len(value)))
+func (Binary) Encode(enc *Encoder, value []byte) error {
+	var vtInt = Int{}
+
+	// Encoding int does not return error.
+	//nolint:errcheck
+	//gosec:disable G104
+	vtInt.Encode(enc, int64(len(value)))
 
 	enc.writes = append(enc.writes, enc.Buffer, bytes.NewReader(value))
 	enc.Buffer = new(bytes.Buffer)
+
+	return nil
 }
 
-// Binary decodes arbitrary bytes from the decoders reader. First by reading the
+// Decode decodes arbitrary bytes from the decoders reader. First by reading the
 // length using Int, followed by reading the actual bytes. The returned byte
 // slice is only valid until the next call made to the Decoder.
-func (dec *Decoder) Binary() ([]byte, int, error) {
-	length, lenn, err := dec.Int()
+func (Binary) Decode(dec *Decoder) ([]byte, int, error) {
+	var vtInt = Int{}
+
+	length, lenn, err := vtInt.Decode(dec)
 	if err != nil {
 		return nil, lenn, fmt.Errorf("binfmt: failed to decode binary length: %w", err)
 	}
