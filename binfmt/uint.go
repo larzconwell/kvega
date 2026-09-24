@@ -123,8 +123,9 @@ func (Uint) Decode(dec *Decoder) (uint64, int, error) {
 		shift uint
 	)
 
-	// Loop the bytes in little-endian order since the number of
-	// shifts required to build the original value is unknown.
+	// Loop bytes in little-endian order to simplify how the shift
+	// count is handled, slices.Backward does a reverse loop, so
+	// no copy of the bytes are created.
 	for _, byt := range slices.Backward(bytes[:n]) {
 		value |= uint64(setContinuation(byt, false)) << shift
 		shift += 7

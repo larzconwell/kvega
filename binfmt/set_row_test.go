@@ -21,7 +21,69 @@ func TestEncoderSetRow(t *testing.T) {
 		assert.ErrorContains(t, err, "encode key")
 	})
 
-	t.Run("encodes set rows key and value", func(t *testing.T) {
+	t.Run("encodes set row key and uint value", func(t *testing.T) {
+		t.Parallel()
+
+		key := "こんにちは"
+		value := uint64(30)
+		enc := NewEncoder()
+
+		err := enc.SetRow[Uint](key, value)
+		assert.NoError(t, err)
+
+		assert.Len(t, enc.writes, 2)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			SetRowIdent,
+			0b0001_1110,
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(key), buf)
+
+		var vtUint = Uint{}
+
+		assert.Equal(t, []byte{
+			vtUint.Ident(),
+			0b0001_1110,
+		}, enc.Buffer.Bytes())
+	})
+
+	t.Run("encodes set row key and int value", func(t *testing.T) {
+		t.Parallel()
+
+		key := "こんにちは"
+		value := int64(30)
+		enc := NewEncoder()
+
+		err := enc.SetRow[Int](key, value)
+		assert.NoError(t, err)
+
+		assert.Len(t, enc.writes, 2)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			SetRowIdent,
+			0b0001_1110,
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(key), buf)
+
+		var vtInt = Int{}
+
+		assert.Equal(t, []byte{
+			vtInt.Ident(),
+			0b0011_1100,
+		}, enc.Buffer.Bytes())
+	})
+
+	t.Run("encodes set row key and binary value", func(t *testing.T) {
 		t.Parallel()
 
 		key := "こんにちは"
@@ -57,13 +119,48 @@ func TestEncoderSetRow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, value, buf)
 	})
+
+	t.Run("encodes set row key and string value", func(t *testing.T) {
+		t.Parallel()
+
+		key := "こんにちは"
+		enc := NewEncoder()
+
+		err := enc.SetRow[String](key, key)
+		assert.NoError(t, err)
+
+		assert.Len(t, enc.writes, 4)
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			SetRowIdent,
+			0b0001_1110,
+		}, enc.writes[0].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err := io.ReadAll(enc.writes[1].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, []byte(key), buf)
+
+		var vtString = String{}
+
+		//nolint:forcetypeassert
+		assert.Equal(t, []byte{
+			vtString.Ident(),
+			0b0001_1110,
+		}, enc.writes[2].(*bytes.Buffer).Bytes())
+
+		//nolint:forcetypeassert
+		buf, err = io.ReadAll(enc.writes[3].(*strings.Reader))
+		assert.NoError(t, err)
+		assert.Equal(t, key, string(buf))
+	})
 }
 
 func TestDecoderSetRow(t *testing.T) {
 	t.Parallel()
 
 	var (
-		vtBinary = Binary{}
 		vtString = String{}
 	)
 
@@ -136,6 +233,7 @@ func TestDecoderSetRow(t *testing.T) {
 		err := vtString.Encode(enc, "key")
 		assert.NoError(t, err)
 
+		var vtBinary = Binary{}
 		enc.Buffer.WriteByte(vtBinary.Ident())
 
 		// Force error by writing invalid binary length.
@@ -156,6 +254,62 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.ErrorContains(t, err, "decode value")
 	})
 
+	t.Run("returns the key and uint value", func(t *testing.T) {
+		t.Parallel()
+
+		key := "こんにちは"
+		value := uint64(30)
+		enc := NewEncoder()
+
+		err := vtString.Encode(enc, key)
+		assert.NoError(t, err)
+
+		vtUint := Uint{}
+		enc.Buffer.WriteByte(vtUint.Ident())
+		err = vtUint.Encode(enc, value)
+
+		assert.NoError(t, err)
+
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		dec := NewDecoder(reader)
+		actualKey, actualValue, n, err := dec.SetRow[Uint]()
+		assert.NoError(t, err)
+
+		assert.Equal(t, 16+1+1, n)
+		assert.Equal(t, key, actualKey)
+		assert.Equal(t, value, actualValue)
+	})
+
+	t.Run("returns the key and int value", func(t *testing.T) {
+		t.Parallel()
+
+		key := "こんにちは"
+		value := int64(30)
+		enc := NewEncoder()
+
+		err := vtString.Encode(enc, key)
+		assert.NoError(t, err)
+
+		vtInt := Int{}
+		enc.Buffer.WriteByte(vtInt.Ident())
+		err = vtInt.Encode(enc, value)
+
+		assert.NoError(t, err)
+
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		dec := NewDecoder(reader)
+		actualKey, actualValue, n, err := dec.SetRow[Int]()
+		assert.NoError(t, err)
+
+		assert.Equal(t, 16+1+1, n)
+		assert.Equal(t, key, actualKey)
+		assert.Equal(t, value, actualValue)
+	})
+
 	t.Run("returns the key and binary value", func(t *testing.T) {
 		t.Parallel()
 
@@ -166,6 +320,7 @@ func TestDecoderSetRow(t *testing.T) {
 		err := vtString.Encode(enc, key)
 		assert.NoError(t, err)
 
+		var vtBinary = Binary{}
 		enc.Buffer.WriteByte(vtBinary.Ident())
 		err = vtBinary.Encode(enc, value)
 
@@ -181,5 +336,32 @@ func TestDecoderSetRow(t *testing.T) {
 		assert.Equal(t, 16+1+4, n)
 		assert.Equal(t, key, actualKey)
 		assert.Equal(t, value, actualValue)
+	})
+
+	t.Run("returns the key and string value", func(t *testing.T) {
+		t.Parallel()
+
+		key := "こんにちは"
+		enc := NewEncoder()
+
+		err := vtString.Encode(enc, key)
+		assert.NoError(t, err)
+
+		var vtString = String{}
+		enc.Buffer.WriteByte(vtString.Ident())
+		err = vtString.Encode(enc, key)
+
+		assert.NoError(t, err)
+
+		reader, err := encoderToBufReader(enc)
+		assert.NoError(t, err)
+
+		dec := NewDecoder(reader)
+		actualKey, actualValue, n, err := dec.SetRow[String]()
+		assert.NoError(t, err)
+
+		assert.Equal(t, 16+1+16, n)
+		assert.Equal(t, key, actualKey)
+		assert.Equal(t, key, actualValue)
 	})
 }
