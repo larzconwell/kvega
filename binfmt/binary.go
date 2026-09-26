@@ -9,7 +9,7 @@ import (
 
 var _ ValueType[[]byte] = Binary{}
 
-// Binary implements ValueType[[]byte] and is able to
+// Binary implements [ValueType][[]byte] and is able to
 // encode and decode []byte values.
 type Binary struct{}
 
@@ -39,7 +39,7 @@ func (Binary) Encode(enc *Encoder, value []byte) error {
 
 // Decode decodes arbitrary bytes from the decoders reader. First by reading the
 // length using Int, followed by reading the actual bytes. The returned byte
-// slice is only valid until the next call made to the Decoder.
+// slice is only valid until the next call made to the [Decoder].
 func (Binary) Decode(dec *Decoder) ([]byte, int, error) {
 	var vtInt Int
 

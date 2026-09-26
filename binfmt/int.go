@@ -15,7 +15,7 @@ var (
 
 var _ ValueType[int64] = Int{}
 
-// Int implements ValueType[int64] and is able
+// Int implements [ValueType][int64] and is able
 // to encode and decode int64 values.
 type Int struct{}
 
@@ -34,7 +34,7 @@ func (Int) Ident() byte {
 // one. Positive values meanwhile become double their absolute value.
 //
 // After the int64 has been converted to a uint64, big-endian variable length
-// integer encoding is done, context to which can be gathered by reading Uint.Encode.
+// integer encoding is done, context to which can be gathered by reading [Uint.Encode].
 func (Int) Encode(enc *Encoder, value int64) error {
 	bitSize := unsafe.Sizeof(value) * 8
 
@@ -55,7 +55,7 @@ func (Int) Encode(enc *Encoder, value int64) error {
 
 // Decode decodes a zigzgag encoded value stored in a big-endian variable length integer
 // encoded value that's read from the decoders reader. Up to 10 bytes are read from
-// the decoders reader. If the decoded value overflows int64 ErrDecodeIntOverflow is
+// the decoders reader. If the decoded value overflows int64 [ErrDecodeIntOverflow] is
 // returned.
 func (Int) Decode(dec *Decoder) (int64, int, error) {
 	var vtUint Uint

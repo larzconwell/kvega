@@ -218,54 +218,38 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 	decoder := binfmt.NewDecoder(file)
 
-	if foundOffset {
+	for {
 		row, _, err := edb.readRow(decoder)
-		if err != nil && !errors.Is(err, io.EOF) {
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
 			return nil, err
 		}
 
 		if row.key == key {
+			// Make copy of value since it's only valid for this readRow loop.
+			if row.value != nil {
+				value := make([]byte, len(row.value))
+				copy(value, row.value)
+				row.value = value
+			}
+
 			foundRow = row
-
-			// Copy the value only if a row matching the key was found.
-			value := make([]byte, len(foundRow.value))
-			copy(value, foundRow.value)
-			foundRow.value = value
 		}
-	} else {
-		for {
-			row, _, err := edb.readRow(decoder)
-			if errors.Is(err, io.EOF) {
-				break
-			}
 
-			if err != nil {
-				return nil, err
-			}
-
-			if row.key == key {
-				foundRow = row
-
-				// Copy the value only if a row matching the key was found.
-				value := make([]byte, len(foundRow.value))
-				copy(value, foundRow.value)
-				foundRow.value = value
-			}
+		// Only read a single row if we found offset in index.
+		if foundOffset {
+			break
 		}
 	}
 
-	if foundRow.key == "" {
+	if foundRow.ident == 0 || foundRow.ident == binfmt.DeleteRowIdent {
 		return nil, ErrNotFound
 	}
 
-	switch foundRow.ident {
-	case binfmt.SetRowIdent:
-		return foundRow.value, nil
-	case binfmt.DeleteRowIdent:
-		return nil, ErrNotFound
-	default:
-		panic("unreachable")
-	}
+	return foundRow.value, nil
 }
 
 // writeRow writes row data by filling a buffer using the given
@@ -303,40 +287,32 @@ func (edb *EmbeddedDB) writeRow(encode func(enc *binfmt.Encoder) (string, error)
 // readRow reads one row from the reader, returning io.EOF
 // if the end of the file has been reached.
 func (edb *EmbeddedDB) readRow(dec *binfmt.Decoder) (row, int, error) {
-	rowIdent, err := dec.RowIdent()
+	ident, key, valueDecoder, rown, err := dec.Row()
 	if errors.Is(err, io.EOF) {
-		return row{}, 0, io.EOF
+		return row{}, rown, io.EOF
 	}
 
 	if err != nil {
-		return row{}, 0, fmt.Errorf("kvega: failed to read row identifier: %w", err)
+		return row{}, rown, fmt.Errorf("kvega: failed to read row: %w", err)
 	}
 
-	switch rowIdent {
-	case binfmt.SetRowIdent:
-		key, value, n, err := dec.SetRow[binfmt.Binary]()
-		if err != nil {
-			return row{}, 1 + n, fmt.Errorf("kvega: failed to read set row: %w", err)
-		}
-
+	if !valueDecoder.HasValue {
 		return row{
-			ident: binfmt.SetRowIdent,
+			ident: ident,
 			key:   key,
-			value: value,
-		}, 1 + n, nil
-	case binfmt.DeleteRowIdent:
-		key, n, err := dec.DeleteRow()
-		if err != nil {
-			return row{}, 1 + n, fmt.Errorf("kvega: failed to read delete row: %w", err)
-		}
-
-		return row{
-			ident: binfmt.DeleteRowIdent,
-			key:   key,
-		}, 1 + n, nil
-	default:
-		panic("unreachable")
+		}, rown, nil
 	}
+
+	value, valuen, err := valueDecoder.Get[binfmt.Binary]()
+	if err != nil {
+		return row{}, rown + valuen, fmt.Errorf("kvega: failed to decode value: %w", err)
+	}
+
+	return row{
+		ident: ident,
+		key:   key,
+		value: value,
+	}, rown + valuen, nil
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,

@@ -341,7 +341,7 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		edb, err := OpenEmbeddedDB(path)
 		assert.Nil(t, edb)
 		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
-		assert.ErrorContains(t, err, "read row identifier")
+		assert.ErrorContains(t, err, "read row")
 	})
 
 	t.Run("builds an index of keys to file offsets", func(t *testing.T) {
@@ -687,7 +687,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 		value, err := edb.Get("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
-		assert.ErrorContains(t, err, "read row identifier")
+		assert.ErrorContains(t, err, "read row")
 	})
 
 	t.Run("reads row at index offset if found for key", func(t *testing.T) {
@@ -768,7 +768,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			value, err := edb.Get("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-			assert.ErrorContains(t, err, "read set row")
+			assert.ErrorContains(t, err, "decode value")
 		})
 
 		t.Run("returns the value stored in the row for the key", func(t *testing.T) {
@@ -848,7 +848,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			value, err := edb.Get("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-			assert.ErrorContains(t, err, "read delete row")
+			assert.ErrorContains(t, err, "read row")
 		})
 
 		t.Run("returns ErrNotFound when a delete row is found for the key", func(t *testing.T) {

@@ -17,7 +17,7 @@ var (
 
 var _ ValueType[uint64] = Uint{}
 
-// Uint implements ValueType[uint64] and is able to
+// Uint implements [ValueType][uint64] and is able to
 // encode and decode uint64 values.
 type Uint struct{}
 
@@ -39,9 +39,9 @@ func (Uint) Ident() byte {
 // is a mapping between the values binary representation and the encoded bytes binary
 // representation.
 //
-// [___10000] [10001010] - Binary representation of value 0x108a.
-// [__100001] [_0001010] - Splitting value into 7 bit chunks.
-// [10100001] [00001010] - Adding continuation bits to the 7 bit chunks.
+//	[___10000] [10001010] // Binary representation of value 0x108a.
+//	[__100001] [_0001010] // Splitting value into 7 bit chunks.
+//	[10100001] [00001010] // Adding continuation bits to the 7 bit chunks.
 func (Uint) Encode(enc *Encoder, value uint64) error {
 	// Determine number of bytes required to store encoded value.
 	msbidx := bits.Len64(value)
@@ -79,7 +79,7 @@ func (Uint) Encode(enc *Encoder, value uint64) error {
 
 // Decode decodes a big-endian variable length integer encoded value from the decoders
 // reader. It will read bytes until it detects the end of the encoded uint, up to
-// 10 bytes. If the decoded value overflows uint64 ErrDecodeUintOverflow is returned.
+// 10 bytes. If the decoded value overflows uint64 [ErrDecodeUintOverflow] is returned.
 func (Uint) Decode(dec *Decoder) (uint64, int, error) {
 	var n int
 
