@@ -38,9 +38,9 @@ type EmbeddedDB struct {
 	wmu    sync.Mutex
 	writer *os.File
 
-	readCounter atomic.Int32
-	rmus        []sync.Mutex
-	readers     []*os.File
+	readerCounter atomic.Int32
+	rmus          []sync.Mutex
+	readers       []*os.File
 }
 
 // OpenEmbeddedDB opens the database located at the given path, creating it if it doesn't exist.
@@ -197,7 +197,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		return nil, ErrEmptyKey
 	}
 
-	idx := int(edb.readCounter.Add(1)) % len(edb.readers)
+	idx := int(edb.readerCounter.Add(1)) % len(edb.readers)
 	idx = max(-idx, idx) // Non branching way to get absolute value, doesn't work at math.MinInt
 
 	edb.rmus[idx].Lock()
@@ -219,7 +219,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	decoder := binfmt.NewDecoder(file)
 
 	for {
-		row, _, err := edb.readRow(decoder)
+		row, _, err := edb.decodeRow(decoder)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -229,7 +229,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		}
 
 		if row.key == key {
-			// Make copy of value since it's only valid for this readRow loop.
+			// Make copy of value since it's only valid for this decodeRow loop.
 			if row.value != nil {
 				value := make([]byte, len(row.value))
 				copy(value, row.value)
@@ -239,7 +239,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 			foundRow = row
 		}
 
-		// Only read a single row if we found offset in index.
+		// Only decode a single row if we found offset in index.
 		if foundOffset {
 			break
 		}
@@ -284,16 +284,16 @@ func (edb *EmbeddedDB) writeRow(encode func(enc *binfmt.Encoder) (string, error)
 	return nil
 }
 
-// readRow reads one row from the reader, returning io.EOF
+// decodeRow decodes one row from the reader, returning io.EOF
 // if the end of the file has been reached.
-func (edb *EmbeddedDB) readRow(dec *binfmt.Decoder) (row, int, error) {
+func (edb *EmbeddedDB) decodeRow(dec *binfmt.Decoder) (row, int, error) {
 	ident, key, valueDecoder, rown, err := dec.Row()
 	if errors.Is(err, io.EOF) {
 		return row{}, rown, io.EOF
 	}
 
 	if err != nil {
-		return row{}, rown, fmt.Errorf("kvega: failed to read row: %w", err)
+		return row{}, rown, fmt.Errorf("kvega: failed to decode row: %w", err)
 	}
 
 	if !valueDecoder.HasValue {
@@ -333,7 +333,7 @@ func (edb *EmbeddedDB) buildIndex() error {
 	decoder := binfmt.NewDecoder(file)
 
 	for {
-		row, n, err := edb.readRow(decoder)
+		row, n, err := edb.decodeRow(decoder)
 		if errors.Is(err, io.EOF) {
 			break
 		}

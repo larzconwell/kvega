@@ -341,7 +341,7 @@ func TestOpenEmbeddedDB(t *testing.T) {
 		edb, err := OpenEmbeddedDB(path)
 		assert.Nil(t, edb)
 		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
-		assert.ErrorContains(t, err, "read row")
+		assert.ErrorContains(t, err, "decode row")
 	})
 
 	t.Run("builds an index of keys to file offsets", func(t *testing.T) {
@@ -687,7 +687,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 		value, err := edb.Get("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
-		assert.ErrorContains(t, err, "read row")
+		assert.ErrorContains(t, err, "decode row")
 	})
 
 	t.Run("reads row at index offset if found for key", func(t *testing.T) {
@@ -848,7 +848,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			value, err := edb.Get("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
-			assert.ErrorContains(t, err, "read row")
+			assert.ErrorContains(t, err, "decode row")
 		})
 
 		t.Run("returns ErrNotFound when a delete row is found for the key", func(t *testing.T) {
@@ -926,7 +926,7 @@ func readRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
 	rows := make([]row, 0, 2)
 
 	for {
-		row, _, err := edb.readRow(dec)
+		row, _, err := edb.decodeRow(dec)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -935,7 +935,7 @@ func readRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
 			return nil, err
 		}
 
-		// Copy value so it's not overwritten on next read row.
+		// Make copy of value since it's only valid for this decodeRow loop.
 		if row.value != nil {
 			value := make([]byte, len(row.value))
 			copy(value, row.value)
