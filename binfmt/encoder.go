@@ -53,7 +53,7 @@ func (enc *Encoder) WriteTo(w io.Writer) (int64, error) {
 }
 
 // SetRow encodes a set row with key and value adding it to the encoder.
-func (enc *Encoder) SetRow[Vt ValueType[T], T any](key string, value T) error {
+func (enc *Encoder) SetRow[VT ValueType[T], T any](key string, value T) error {
 	enc.Buffer.WriteByte(SetRowIdent)
 
 	var vtString String
@@ -63,7 +63,7 @@ func (enc *Encoder) SetRow[Vt ValueType[T], T any](key string, value T) error {
 		return fmt.Errorf("binfmt: failed to encode key: %w", err)
 	}
 
-	var vt Vt
+	var vt VT
 	enc.Buffer.WriteByte(vt.Ident())
 
 	err = vt.Encode(enc, value)

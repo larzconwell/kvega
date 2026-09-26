@@ -935,13 +935,19 @@ func readRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
 			return nil, err
 		}
 
-		// Make copy of value since it's only valid for this decodeRow loop.
-		if row.value != nil {
-			value := make([]byte, len(row.value))
-			copy(value, row.value)
+		if row.valueDecoder.HasValue {
+			tmpValue, _, err := row.valueDecoder.Get[binfmt.Binary]()
+			if err != nil {
+				return nil, err
+			}
+
+			// Copy of value since it's only valid for this decodeRow loop.
+			value := make([]byte, len(tmpValue))
+			copy(value, tmpValue)
 			row.value = value
 		}
 
+		row.valueDecoder = binfmt.RowValueDecoder{}
 		rows = append(rows, row)
 	}
 

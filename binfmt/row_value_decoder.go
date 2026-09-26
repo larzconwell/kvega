@@ -46,3 +46,45 @@ func (rvd RowValueDecoder) Get[VT ValueType[T], T any]() (T, int, error) {
 
 	return value, 1 + n, nil
 }
+
+// Skip decodes a value from the decoders reader and discards it.
+// If an error occurs decoding the rows value the error is returned,
+// and if the value type identifier is not valid then
+// [ErrRowValueIdentInvalid] is returned.
+func (rvd RowValueDecoder) Skip() (int, error) {
+	ident, err := rvd.dec.reader.ReadByte()
+	if errors.Is(err, io.EOF) {
+		err = io.ErrUnexpectedEOF
+	}
+
+	if err != nil {
+		return 0, fmt.Errorf("binfmt: failed to decode value type identifier: %w", err)
+	}
+
+	var (
+		vtUint   Uint
+		vtInt    Int
+		vtBinary Binary
+		vtString String
+		n        int
+	)
+
+	switch ident {
+	case vtUint.Ident():
+		_, n, err = vtUint.Decode(rvd.dec)
+	case vtInt.Ident():
+		_, n, err = vtInt.Decode(rvd.dec)
+	case vtBinary.Ident():
+		_, n, err = vtBinary.Decode(rvd.dec)
+	case vtString.Ident():
+		_, n, err = vtString.Decode(rvd.dec)
+	default:
+		return 1, ErrRowValueIdentInvalid
+	}
+
+	if err != nil {
+		return 1 + n, fmt.Errorf("binfmt: failed to decode value: %w", err)
+	}
+
+	return 1 + n, nil
+}
