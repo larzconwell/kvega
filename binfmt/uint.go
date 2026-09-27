@@ -27,7 +27,8 @@ func (Uint) Ident() byte {
 }
 
 // Encode encodes value using big-endian variable length integer encoding and adds it to the
-// encoder. 1 to 10 bytes may be added to the encoder depending on the value.
+// encoder. 1 to 10 bytes may be added to the encoder depending on the value. Encode returns
+// nil error.
 //
 // Variable length integer encoding works by splitting value into 7 bit chunks, where the
 // 7 bits of value data are located in the least significant portion of a byte, the most
@@ -79,7 +80,10 @@ func (Uint) Encode(enc *Encoder, value uint64) error {
 
 // Decode decodes a big-endian variable length integer encoded value from the decoders
 // reader. It will read bytes until it detects the end of the encoded uint, up to
-// 10 bytes. If the decoded value overflows uint64 [ErrDecodeUintOverflow] is returned.
+// 10 bytes.
+//
+// [ErrDecodeUintInvalid] is returned if the end of the encoded uint is not encountered within 10 bytes.
+// [ErrDecodeUintOverflow] is returned if the decoded value would exceed uint64.
 func (Uint) Decode(dec *Decoder) (uint64, int, error) {
 	var n int
 

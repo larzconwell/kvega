@@ -22,7 +22,7 @@ func (Binary) Ident() byte {
 // and then moves the current buffer to the writes list, followed by adding
 // value to the writes list without a copy of value, it finally creates
 // a new empty current buffer for further writes. value may contain any
-// byte including NUL.
+// byte including NUL. Encode returns nil error.
 func (Binary) Encode(enc *Encoder, value []byte) error {
 	var vtInt Int
 

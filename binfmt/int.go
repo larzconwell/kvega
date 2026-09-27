@@ -26,7 +26,7 @@ func (Int) Ident() byte {
 
 // Encode encodes value using zigzag encoding along with big-endian variable length integer
 // encoding and adds it to the encoder. 1 to 10 bytes may be added to the encoder
-// depending on the value.
+// depending on the value. Encode returns nil error.
 //
 // The first step is zigzag encoding which is a method to represent a signed integer
 // as an unsigned integer by evenly spreading positive and negative values across the
@@ -55,8 +55,10 @@ func (Int) Encode(enc *Encoder, value int64) error {
 
 // Decode decodes a zigzgag encoded value stored in a big-endian variable length integer
 // encoded value that's read from the decoders reader. Up to 10 bytes are read from
-// the decoders reader. If the decoded value overflows int64 [ErrDecodeIntOverflow] is
-// returned.
+// the decoders reader.
+//
+// [ErrDecodeIntInvalid] is returned if the end of the encoded int is not encountered within 10 bytes.
+// [ErrDecodeIntOverflow] is returned if the decoded value would exceed int64.
 func (Int) Decode(dec *Decoder) (int64, int, error) {
 	var vtUint Uint
 

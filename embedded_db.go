@@ -47,10 +47,10 @@ type EmbeddedDB struct {
 // OpenEmbeddedDB opens the database located at the given path, creating it if it doesn't exist.
 // All writes to the database are flushed to disk at the time of the write.
 //
-// The returned EmbeddedDB is safe for concurrent use by multiple goroutines, and as a result
+// The returned [EmbeddedDB] is safe for concurrent use by multiple goroutines, and as a result
 // should only require one call.
 //
-// The returned EmbeddedDB should be closed when finished to ensure caches are flushed.
+// The returned [EmbeddedDB] should be closed when finished to ensure caches are flushed.
 func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 	err := os.MkdirAll(filepath.Dir(path), 0o750)
 	if err != nil {
@@ -115,9 +115,9 @@ func OpenEmbeddedDB(path string) (*EmbeddedDB, error) {
 	return edb, nil
 }
 
-// Close handles flushing caches and releasing resources related to the EmbeddedDB.
+// Close handles flushing caches and releasing resources related to the [EmbeddedDB].
 //
-// ErrClosed is returned if the database has been closed.
+// [ErrClosed] is returned if the database has been closed.
 func (edb *EmbeddedDB) Close() error {
 	if edb.closed.Load() {
 		return ErrClosed
@@ -153,7 +153,7 @@ func (edb *EmbeddedDB) Close() error {
 
 // Set handles setting the key to the provided value.
 //
-// ErrClosed is returned if the database has been closed.
+// [ErrClosed] is returned if the database has been closed.
 func (edb *EmbeddedDB) Set(key string, value []byte) error {
 	if edb.closed.Load() {
 		return ErrClosed
@@ -170,7 +170,7 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 
 // Delete handles deleting the provided key if one exists.
 //
-// ErrClosed is returned if the database has been closed.
+// [ErrClosed] is returned if the database has been closed.
 func (edb *EmbeddedDB) Delete(key string) error {
 	if edb.closed.Load() {
 		return ErrClosed
@@ -187,8 +187,8 @@ func (edb *EmbeddedDB) Delete(key string) error {
 
 // Get returns the value that's associated with the key if one exists.
 //
-// ErrNotFound is returned if the key was not found.
-// ErrClosed is returned if the database has been closed.
+// [ErrNotFound] is returned if the key was not found.
+// [ErrClosed] is returned if the database has been closed.
 func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	if edb.closed.Load() {
 		return nil, ErrClosed

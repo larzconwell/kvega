@@ -32,11 +32,13 @@ type DB interface {
 	//
 	// ErrClosed is returned if the database has been closed.
 	Set(key string, value []byte) error
+
 	// Get returns the value that's associated with the key if one exists.
 	//
 	// ErrNotFound is returned if the key was not found.
 	// ErrClosed is returned if the database has been closed.
 	Get(key string) ([]byte, error)
+
 	// Delete handles deleting the provided key if one exists.
 	//
 	// ErrClosed is returned if the database has been closed.
@@ -50,10 +52,10 @@ type DB interface {
 // - file:///var/kvega/production.kvega
 // - file:///C:/ProgramData/kvega/production.kvega
 //
-// The returned DB is safe for concurrent use by multiple goroutines, and as a result
+// The returned [DB] is safe for concurrent use by multiple goroutines, and as a result
 // should only require one call.
 //
-// The returned DB should be closed when finished to ensure caches are synced.
+// The returned [DB] should be closed when finished to ensure caches are synced.
 //
 //nolint:ireturn
 func OpenDB(location string) (DB, error) {

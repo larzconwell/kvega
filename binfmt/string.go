@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	// ErrStringInvalid is returned when a string contains invalid UTF-8 runes.
+	// ErrStringInvalid is returned when a string is not a valid UTF-8 string.
 	ErrStringInvalid = errors.New("binfmt: string contains invalid data")
 )
 
@@ -28,8 +28,9 @@ func (String) Ident() byte {
 // Encode encodes value by adding its length to the encoders current buffer
 // and then moves the current buffer to the writes list, followed by adding
 // value to the writes list, it finally creates a new empty current buffer
-// for further writes. [ErrStringInvalid] is returned when value is not
-// valid UTF-8.
+// for further writes.
+//
+// [ErrStringInvalid] is returned when value is not valid UTF-8.
 func (String) Encode(enc *Encoder, value string) error {
 	if !utf8.ValidString(value) {
 		return ErrStringInvalid
@@ -49,8 +50,9 @@ func (String) Encode(enc *Encoder, value string) error {
 }
 
 // Decode decodes a string from the decoders reader. First by reading the length
-// using [Int.Decode], followed by reading the bytes for the string. [ErrStringInvalid]
-// is returned when the bytes decoded contain invalid UTF-8 runes.
+// using [Int.Decode], followed by reading the bytes for the string.
+//
+// [ErrStringInvalid] is returned when the decoded bytes are not valid UTF-8.
 func (String) Decode(dec *Decoder) (string, int, error) {
 	var vtInt Int
 
