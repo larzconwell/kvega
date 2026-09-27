@@ -13,9 +13,11 @@ import (
 	"github.com/larzconwell/kvega/binfmt"
 )
 
-var _ DB = (*EmbeddedDB)(nil)
-
 var (
+	// ErrClosed is returned when a database has been closed.
+	ErrClosed = errors.New("kvega: database closed")
+	// ErrNotFound is returned when a key could not be found.
+	ErrNotFound = errors.New("kvega: key not found")
 	// ErrEmptyKey is returned when the given key is empty.
 	ErrEmptyKey = errors.New("kvega: empty key")
 )
