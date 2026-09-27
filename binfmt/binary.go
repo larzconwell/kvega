@@ -10,7 +10,8 @@ import (
 var _ ValueType[[]byte] = Binary{}
 
 // Binary implements [ValueType][[]byte] and is able to
-// encode and decode []byte values.
+// encode and decode []byte values. Keep in sync with
+// type alias in kvega package.
 type Binary struct{}
 
 // Ident returns the Binary identifier.

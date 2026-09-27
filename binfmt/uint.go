@@ -18,7 +18,8 @@ var (
 var _ ValueType[uint64] = Uint{}
 
 // Uint implements [ValueType][uint64] and is able to
-// encode and decode uint64 values.
+// encode and decode uint64 values. Keep in sync with
+// type alias in kvega package.
 type Uint struct{}
 
 // Ident returns the Uint identifier.

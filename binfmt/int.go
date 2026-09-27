@@ -16,7 +16,8 @@ var (
 var _ ValueType[int64] = Int{}
 
 // Int implements [ValueType][int64] and is able
-// to encode and decode int64 values.
+// to encode and decode int64 values. Keep in sync
+// with type alias in kvega package.
 type Int struct{}
 
 // Ident returns the Int identifier.

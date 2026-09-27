@@ -17,7 +17,8 @@ var (
 var _ ValueType[string] = String{}
 
 // String implements [ValueType][string] and is able to
-// encode and decode string values.
+// encode and decode string values. Keep in sync with
+// type alias in kvega package.
 type String struct{}
 
 // Ident returns the String identifier.
