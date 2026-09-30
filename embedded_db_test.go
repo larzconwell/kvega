@@ -18,6 +18,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type row struct {
+	ident byte
+	key   string
+	value []byte
+}
+
 type command struct {
 	typ string
 	key string
@@ -926,7 +932,7 @@ func decodeRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
 	rows := make([]row, 0, 2)
 
 	for {
-		row, _, err := edb.decodeRow(dec)
+		ident, key, valueDecoder, _, err := edb.decodeRow(dec)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -935,20 +941,24 @@ func decodeRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
 			return nil, err
 		}
 
-		if row.valueDecoder.HasValue {
-			tmpValue, _, err := row.valueDecoder.Get[binfmt.Binary]()
+		var value []byte
+
+		if valueDecoder.HasValue {
+			tmpValue, _, err := valueDecoder.Get[binfmt.Binary]()
 			if err != nil {
 				return nil, err
 			}
 
 			// Copy of value since it's only valid for this decodeRow loop.
-			value := make([]byte, len(tmpValue))
+			value = make([]byte, len(tmpValue))
 			copy(value, tmpValue)
-			row.value = value
 		}
 
-		row.valueDecoder = binfmt.RowValueDecoder{}
-		rows = append(rows, row)
+		rows = append(rows, row{
+			ident: ident,
+			key:   key,
+			value: value,
+		})
 	}
 
 	return rows, nil

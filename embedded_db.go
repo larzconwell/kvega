@@ -22,13 +22,6 @@ var (
 	ErrEmptyKey = errors.New("kvega: empty key")
 )
 
-type row struct {
-	ident        byte
-	key          string
-	valueDecoder binfmt.RowValueDecoder
-	value        []byte
-}
-
 // EmbeddedDB is an implementation of DB that provides access to a database backed by
 // a file stored on the local disk.
 type EmbeddedDB struct {
@@ -217,12 +210,15 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
-	var foundRow row
+	var (
+		found bool
+		value []byte
+	)
 
 	decoder := binfmt.NewDecoder(file)
 
 	for {
-		row, _, err := edb.decodeRow(decoder)
+		_, rowKey, rowValueDecoder, _, err := edb.decodeRow(decoder)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -231,22 +227,23 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 			return nil, err
 		}
 
-		if row.key == key {
-			if row.valueDecoder.HasValue {
-				tmpValue, _, err := row.valueDecoder.Get[binfmt.Binary]()
+		if rowKey == key {
+			if rowValueDecoder.HasValue {
+				tmpValue, _, err := rowValueDecoder.Get[binfmt.Binary]()
 				if err != nil {
 					return nil, fmt.Errorf("kvega: failed to decode value: %w", err)
 				}
 
 				// Copy of value since it's only valid for this decodeRow loop.
-				value := make([]byte, len(tmpValue))
+				value = make([]byte, len(tmpValue))
 				copy(value, tmpValue)
-				row.value = value
-			}
 
-			foundRow = row
-		} else if row.valueDecoder.HasValue {
-			_, err := row.valueDecoder.Skip()
+				found = true
+			} else {
+				found = false // If decode has no value then it's a delete row.
+			}
+		} else if rowValueDecoder.HasValue {
+			_, err := rowValueDecoder.Skip()
 			if err != nil {
 				return nil, fmt.Errorf("kvega: failed to decode value: %w", err)
 			}
@@ -258,11 +255,11 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		}
 	}
 
-	if foundRow.ident == 0 || foundRow.ident == binfmt.DeleteRowIdent {
+	if !found {
 		return nil, ErrNotFound
 	}
 
-	return foundRow.value, nil
+	return value, nil
 }
 
 // encodeRow encodes row data by filling a buffer using the given
@@ -297,23 +294,15 @@ func (edb *EmbeddedDB) encodeRow(encode func(enc *binfmt.Encoder) (string, error
 	return nil
 }
 
-// decodeRow decodes one row from the reader, returning io.EOF
-// if the end of the file has been reached.
-func (edb *EmbeddedDB) decodeRow(dec *binfmt.Decoder) (row, int, error) {
+// decodeRow decodes one row from the reader, returning
+// io.EOF if the end of the file has been reached.
+func (edb *EmbeddedDB) decodeRow(dec *binfmt.Decoder) (byte, string, binfmt.RowValueDecoder, int, error) {
 	ident, key, valueDecoder, n, err := dec.Row()
-	if errors.Is(err, io.EOF) {
-		return row{}, n, io.EOF
-	}
-
 	if err != nil {
-		return row{}, n, fmt.Errorf("kvega: failed to decode row: %w", err)
+		return ident, key, valueDecoder, n, fmt.Errorf("kvega: failed to decode row: %w", err)
 	}
 
-	return row{
-		ident:        ident,
-		key:          key,
-		valueDecoder: valueDecoder,
-	}, n, nil
+	return ident, key, valueDecoder, n, nil
 }
 
 // buildIndex builds an index of keys to their respective offset in the file,
@@ -334,7 +323,7 @@ func (edb *EmbeddedDB) buildIndex() error {
 	decoder := binfmt.NewDecoder(file)
 
 	for {
-		row, rown, err := edb.decodeRow(decoder)
+		_, key, valueDecoder, rown, err := edb.decodeRow(decoder)
 		if errors.Is(err, io.EOF) {
 			break
 		}
@@ -344,14 +333,14 @@ func (edb *EmbeddedDB) buildIndex() error {
 		}
 
 		var valuen int
-		if row.valueDecoder.HasValue {
-			valuen, err = row.valueDecoder.Skip()
+		if valueDecoder.HasValue {
+			valuen, err = valueDecoder.Skip()
 			if err != nil {
 				return fmt.Errorf("kvega: failed to decode value: %w", err)
 			}
 		}
 
-		index[row.key] = offset
+		index[key] = offset
 		offset += int64(rown) + int64(valuen)
 	}
 
