@@ -149,7 +149,7 @@ func (edb *EmbeddedDB) Close() error {
 // Set handles setting the key to the provided value.
 //
 // [ErrClosed] is returned if the database has been closed.
-func (edb *EmbeddedDB) Set(key string, value []byte) error {
+func (edb *EmbeddedDB) Set[VT ValueType[T], T any](key string, value T) error {
 	if edb.closed.Load() {
 		return ErrClosed
 	}
@@ -159,7 +159,7 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 	}
 
 	return edb.encodeRow(func(enc *binfmt.Encoder) (string, error) {
-		return key, enc.SetRow[binfmt.Binary](key, value)
+		return key, enc.SetRow[VT](key, value)
 	})
 }
 
