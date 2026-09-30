@@ -9,6 +9,17 @@ import (
 // ErrRowValueIdentInvalid is returned when a row is decoded that has an invalid value type identifier.
 var ErrRowValueIdentInvalid = errors.New("binfmt: row has invalid value type identifier")
 
+// ValueTypeMismatchError is returned when getting a value
+// that has a different value type than expected.
+type ValueTypeMismatchError struct {
+	Expected byte
+	Found    byte
+}
+
+func (vtme ValueTypeMismatchError) Error() string {
+	return fmt.Sprintf(`binfmt: expected value type %q but found %q instead`, vtme.Expected, vtme.Found)
+}
+
 // RowValueDecoder is used by [Decoder.Row] to enable decoding a rows value,
 // or skip it depending on what the caller wants to do once they've received
 // the row identifier and key.
@@ -36,7 +47,10 @@ func (rvd RowValueDecoder) Get[VT ValueType[T], T any]() (T, int, error) {
 	}
 
 	if ident != vt.Ident() {
-		return value, 1, ErrRowValueIdentInvalid
+		return value, 1, ValueTypeMismatchError{
+			Expected: vt.Ident(),
+			Found:    ident,
+		}
 	}
 
 	value, n, err := vt.Decode(rvd.dec)
