@@ -165,7 +165,7 @@ func (edb *EmbeddedDB) Set(key string, value []byte) error {
 		return ErrEmptyKey
 	}
 
-	return edb.writeRow(func(enc *binfmt.Encoder) (string, error) {
+	return edb.encodeRow(func(enc *binfmt.Encoder) (string, error) {
 		return key, enc.SetRow[binfmt.Binary](key, value)
 	})
 }
@@ -182,7 +182,7 @@ func (edb *EmbeddedDB) Delete(key string) error {
 		return ErrEmptyKey
 	}
 
-	return edb.writeRow(func(enc *binfmt.Encoder) (string, error) {
+	return edb.encodeRow(func(enc *binfmt.Encoder) (string, error) {
 		return key, enc.DeleteRow(key)
 	})
 }
@@ -265,10 +265,10 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	return foundRow.value, nil
 }
 
-// writeRow writes row data by filling a buffer using the given
+// encodeRow encodes row data by filling a buffer using the given
 // fill function and updates the index for the returned key to
-// the offset to the newly written row.
-func (edb *EmbeddedDB) writeRow(encode func(enc *binfmt.Encoder) (string, error)) error {
+// the offset to the newly encoded row.
+func (edb *EmbeddedDB) encodeRow(encode func(enc *binfmt.Encoder) (string, error)) error {
 	edb.wmu.Lock()
 	defer edb.wmu.Unlock()
 

@@ -486,7 +486,7 @@ func TestEmbeddedDBSet(t *testing.T) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		actualRows, err := readRows(edb, file)
+		actualRows, err := decodeRows(edb, file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, []row{
@@ -570,7 +570,7 @@ func TestEmbeddedDBDelete(t *testing.T) {
 		_, err = file.Seek(0, io.SeekStart)
 		assert.NoError(t, err)
 
-		actualRows, err := readRows(edb, file)
+		actualRows, err := decodeRows(edb, file)
 		assert.NoError(t, err)
 
 		assert.Equal(t, []row{
@@ -921,7 +921,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 	})
 }
 
-func readRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
+func decodeRows(edb *EmbeddedDB, reader io.Reader) ([]row, error) {
 	dec := binfmt.NewDecoder(reader)
 	rows := make([]row, 0, 2)
 
