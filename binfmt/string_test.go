@@ -83,7 +83,7 @@ func TestStringDecode(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
-		value, n, err := vtString.Decode(dec)
+		value, n, err := vtString.Decode(dec, false)
 
 		assert.Empty(t, value)
 		assert.Zero(t, n)
@@ -104,7 +104,7 @@ func TestStringDecode(t *testing.T) {
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		value, n, err := vtString.Decode(dec)
+		value, n, err := vtString.Decode(dec, false)
 
 		assert.Empty(t, value)
 		assert.Equal(t, 3, n)
@@ -127,7 +127,7 @@ func TestStringDecode(t *testing.T) {
 			errOn: 5,
 		})
 
-		value, n, err := vtString.Decode(dec)
+		value, n, err := vtString.Decode(dec, false)
 		assert.Empty(t, value)
 		assert.Equal(t, 5, n)
 		assert.ErrorIs(t, err, io.ErrClosedPipe)
@@ -149,7 +149,7 @@ func TestStringDecode(t *testing.T) {
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := vtString.Decode(dec)
+		actual, n, err := vtString.Decode(dec, false)
 
 		assert.Empty(t, actual)
 		assert.Equal(t, len(value)+1, n)
@@ -167,7 +167,7 @@ func TestStringDecode(t *testing.T) {
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := vtString.Decode(dec)
+		actual, n, err := vtString.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -189,7 +189,7 @@ func TestStringDecode(t *testing.T) {
 		assert.NoError(t, err)
 
 		dec := NewDecoder(reader)
-		actual, n, err := vtString.Decode(dec)
+		actual, n, err := vtString.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, len(value)+1, n)

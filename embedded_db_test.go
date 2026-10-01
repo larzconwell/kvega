@@ -97,7 +97,7 @@ func BenchmarkEmbeddedDBGet(b *testing.B) {
 
 		b.StartTimer()
 
-		_, err := edb.Get(key)
+		_, err := edb.Get[Binary](key)
 		require.NoError(b, err)
 	}
 }
@@ -134,7 +134,7 @@ func BenchmarkParallelEmbeddedDBGet(b *testing.B) {
 		for pb.Next() {
 			key := strconv.Itoa(rand.IntN(keys))
 
-			_, err := edb.Get(key)
+			_, err := edb.Get[Binary](key)
 			require.NoError(b, err)
 		}
 	})
@@ -169,7 +169,7 @@ func BenchmarkEmbeddedDBGetErrNotFound(b *testing.B) {
 	b.ResetTimer()
 
 	for b.Loop() {
-		_, err := edb.Get("not_found")
+		_, err := edb.Get[Binary]("not_found")
 		require.ErrorIs(b, err, ErrNotFound)
 	}
 }
@@ -223,7 +223,7 @@ func FuzzEmbeddedDB(f *testing.F) {
 
 		assert.NoError(t, edb.Set[Binary](key, value))
 
-		retrievedValue, err := edb.Get(key)
+		retrievedValue, err := edb.Get[Binary](key)
 		assert.NoError(t, err)
 		assert.Equal(t, value, retrievedValue)
 	})
@@ -274,7 +274,7 @@ func TestParallelEmbeddedDB(t *testing.T) {
 				case "get":
 					key := <-sets
 
-					value, err := edb.Get(key)
+					value, err := edb.Get[Binary](key)
 					assert.NoError(t, err)
 					assert.Equal(t, kv[key], value)
 				}
@@ -641,7 +641,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, edb.Close())
 
-		value, err := edb.Get("key")
+		value, err := edb.Get[Binary]("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrClosed)
 	})
@@ -658,7 +658,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			assert.NoError(t, edb.Close())
 		}()
 
-		value, err := edb.Get("")
+		value, err := edb.Get[Binary]("")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrEmptyKey)
 	})
@@ -675,7 +675,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			assert.NoError(t, edb.Close())
 		}()
 
-		value, err := edb.Get("key")
+		value, err := edb.Get[Binary]("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
@@ -708,7 +708,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 		err = file.Sync()
 		assert.NoError(t, err)
 
-		value, err := edb.Get("key")
+		value, err := edb.Get[Binary]("key")
 		assert.Nil(t, value)
 		assert.ErrorIs(t, err, binfmt.ErrRowIdentInvalid)
 		assert.ErrorContains(t, err, "decode row")
@@ -733,9 +733,9 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.NotEqual(t, 0, edb.index["key"])
 		edb.index["key"] = 0
 
-		value, err := edb.Get("key")
+		value, err := edb.Get[Binary]("key")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte("value"), value)
+		assert.Equal(t, "value", string(value))
 	})
 
 	t.Run("reads all rows to find key if not found in the index", func(t *testing.T) {
@@ -757,9 +757,9 @@ func TestEmbeddedDBGet(t *testing.T) {
 		assert.NotEmpty(t, edb.index)
 		edb.index = nil
 
-		value, err := edb.Get("key")
+		value, err := edb.Get[Binary]("key")
 		assert.NoError(t, err)
-		assert.Equal(t, []byte("value2"), value)
+		assert.Equal(t, "value2", string(value))
 	})
 
 	t.Run("reading set data", func(t *testing.T) {
@@ -789,10 +789,38 @@ func TestEmbeddedDBGet(t *testing.T) {
 			_, err = enc.WriteTo(edb.writer)
 			assert.NoError(t, err)
 
-			value, err := edb.Get("key")
+			value, err := edb.Get[Binary]("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 			assert.ErrorContains(t, err, "decode value")
+		})
+
+		t.Run("returns error if value stored in row is different type than expected", func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				vtBinary Binary
+				vtInt    Int
+			)
+
+			path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+			edb, err := OpenEmbeddedDB(path)
+			assert.NoError(t, err)
+
+			defer func() {
+				assert.NoError(t, edb.Close())
+			}()
+
+			assert.NoError(t, edb.Set[Binary]("key", []byte("value")))
+
+			value, err := edb.Get[Int]("key")
+
+			assert.Zero(t, value)
+			assert.Equal(t, binfmt.ValueTypeMismatchError{
+				Expected: vtInt.Ident(),
+				Found:    vtBinary.Ident(),
+			}, errors.Unwrap(err))
 		})
 
 		t.Run("returns the value stored in the row for the key", func(t *testing.T) {
@@ -809,9 +837,9 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			assert.NoError(t, edb.Set[Binary]("key", []byte("value")))
 
-			value, err := edb.Get("key")
+			value, err := edb.Get[Binary]("key")
 			assert.NoError(t, err)
-			assert.Equal(t, []byte("value"), value)
+			assert.Equal(t, "value", string(value))
 		})
 
 		t.Run("returns the value stored in the row for the key regardless of the size of the value", func(t *testing.T) {
@@ -836,7 +864,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			assert.NoError(t, edb.Set[Binary]("key", value))
 
-			actualValue, err := edb.Get("key")
+			actualValue, err := edb.Get[Binary]("key")
 			assert.NoError(t, err)
 			assert.Equal(t, value, actualValue)
 		})
@@ -869,7 +897,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 			_, err = enc.WriteTo(edb.writer)
 			assert.NoError(t, err)
 
-			value, err := edb.Get("key")
+			value, err := edb.Get[Binary]("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 			assert.ErrorContains(t, err, "decode row")
@@ -889,7 +917,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			assert.NoError(t, edb.Delete("key"))
 
-			value, err := edb.Get("key")
+			value, err := edb.Get[Binary]("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, ErrNotFound)
 		})
@@ -910,14 +938,19 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
-			assert.NoError(t, edb.Set[Binary]("key", []byte("value")))
-			assert.NoError(t, edb.Set[Binary]("key2", []byte("value")))
+			assert.NoError(t, edb.Set[Binary]("key", []byte("abc")))
+			assert.NoError(t, edb.Set[Binary]("key2", []byte("def")))
 			assert.NoError(t, edb.Delete("key"))
-			assert.NoError(t, edb.Set[Binary]("key", []byte("value2")))
+			assert.NoError(t, edb.Set[Binary]("key", []byte("ghi")))
+			assert.NoError(t, edb.Set[Binary]("key2", []byte("jkl")))
 
-			value, err := edb.Get("key")
+			// Empty out index to force unindexed path.
+			assert.NotEmpty(t, edb.index)
+			edb.index = nil
+
+			value, err := edb.Get[Binary]("key")
 			assert.NoError(t, err)
-			assert.Equal(t, []byte("value2"), value)
+			assert.Equal(t, "ghi", string(value))
 		})
 
 		t.Run("returns the result of the last row found for the key assuming the last row was a delete", func(t *testing.T) {
@@ -932,13 +965,18 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
-			assert.NoError(t, edb.Set[Binary]("key", []byte("value")))
-			assert.NoError(t, edb.Set[Binary]("key2", []byte("value")))
+			assert.NoError(t, edb.Set[Binary]("key", []byte("abc")))
+			assert.NoError(t, edb.Set[Binary]("key2", []byte("def")))
 			assert.NoError(t, edb.Delete("key2"))
-			assert.NoError(t, edb.Set[Binary]("key", []byte("value2")))
+			assert.NoError(t, edb.Set[Binary]("key", []byte("ghi")))
 			assert.NoError(t, edb.Delete("key"))
+			assert.NoError(t, edb.Set[Binary]("key2", []byte("jkl")))
 
-			value, err := edb.Get("key")
+			// Empty out index to force unindexed path.
+			assert.NotEmpty(t, edb.index)
+			edb.index = nil
+
+			value, err := edb.Get[Binary]("key")
 			assert.Nil(t, value)
 			assert.ErrorIs(t, err, ErrNotFound)
 		})

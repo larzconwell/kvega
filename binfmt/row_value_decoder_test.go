@@ -125,10 +125,13 @@ func TestRowValueDecoderGet(t *testing.T) {
 		assert.Equal(t, value, actualValue)
 	})
 
-	t.Run("returns rows binary value", func(t *testing.T) {
+	t.Run("returns rows binary value as a copy", func(t *testing.T) {
 		t.Parallel()
 
-		var vtBinary Binary
+		var (
+			vtInt    Int
+			vtBinary Binary
+		)
 
 		value := []byte{0xff, 0xfe, 0xfd}
 
@@ -138,11 +141,19 @@ func TestRowValueDecoderGet(t *testing.T) {
 		err := vtBinary.Encode(enc, value)
 		assert.NoError(t, err)
 
+		enc.Buffer.WriteByte(vtInt.Ident())
+
+		err = vtInt.Encode(enc, 50)
+		assert.NoError(t, err)
+
 		reader, err := encoderToBufReader(enc)
 		assert.NoError(t, err)
 
 		rvd := &RowValueDecoder{dec: NewDecoder(reader)}
 		actualValue, n, err := rvd.Get[Binary]()
+		assert.NoError(t, err)
+
+		_, _, err = rvd.Get[Int]()
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1+1+3, n)

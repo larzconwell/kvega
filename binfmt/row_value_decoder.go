@@ -53,7 +53,7 @@ func (rvd RowValueDecoder) Get[VT ValueType[T], T any]() (T, int, error) {
 		}
 	}
 
-	value, n, err := vt.Decode(rvd.dec)
+	value, n, err := vt.Decode(rvd.dec, true)
 	if err != nil {
 		return value, 1 + n, fmt.Errorf("binfmt: failed to decode value: %w", err)
 	}
@@ -85,13 +85,13 @@ func (rvd RowValueDecoder) Skip() (int, error) {
 
 	switch ident {
 	case vtUint.Ident():
-		_, n, err = vtUint.Decode(rvd.dec)
+		_, n, err = vtUint.Decode(rvd.dec, false)
 	case vtInt.Ident():
-		_, n, err = vtInt.Decode(rvd.dec)
+		_, n, err = vtInt.Decode(rvd.dec, false)
 	case vtBinary.Ident():
-		_, n, err = vtBinary.Decode(rvd.dec)
+		_, n, err = vtBinary.Decode(rvd.dec, false)
 	case vtString.Ident():
-		_, n, err = vtString.Decode(rvd.dec)
+		_, n, err = vtString.Decode(rvd.dec, false)
 	default:
 		return 1, ErrRowValueIdentInvalid
 	}

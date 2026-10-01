@@ -60,10 +60,10 @@ func (Int) Encode(enc *Encoder, value int64) error {
 //
 // [ErrDecodeIntInvalid] is returned if the end of the encoded int is not encountered within 10 bytes.
 // [ErrDecodeIntOverflow] is returned if the decoded value would exceed int64.
-func (Int) Decode(dec *Decoder) (int64, int, error) {
+func (Int) Decode(dec *Decoder, _ bool) (int64, int, error) {
 	var vtUint Uint
 
-	uValue, n, err := vtUint.Decode(dec)
+	uValue, n, err := vtUint.Decode(dec, false)
 	if errors.Is(err, ErrDecodeUintInvalid) {
 		return 0, n, ErrDecodeIntInvalid
 	} else if errors.Is(err, ErrDecodeUintOverflow) {

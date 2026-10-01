@@ -114,7 +114,7 @@ func TestUintDecode(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 
 		assert.Zero(t, value)
 		assert.Equal(t, 3, n)
@@ -125,7 +125,7 @@ func TestUintDecode(t *testing.T) {
 		t.Parallel()
 
 		dec := NewDecoder(&errReadWriter{err: io.ErrClosedPipe})
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 
 		assert.Zero(t, value)
 		assert.Zero(t, n)
@@ -150,14 +150,14 @@ func TestUintDecode(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
 		assert.ErrorIs(t, err, ErrDecodeUintInvalid)
 	})
 
-	t.Run("return error if decoded uint is larger than fits in uint64", func(t *testing.T) {
+	t.Run("return ErrDecodeUintOverflow if decoded uint is larger than fits in uint64", func(t *testing.T) {
 		t.Parallel()
 
 		var buf bytes.Buffer
@@ -175,7 +175,7 @@ func TestUintDecode(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 
 		assert.Zero(t, value)
 		assert.Equal(t, 10, n)
@@ -189,7 +189,7 @@ func TestUintDecode(t *testing.T) {
 		buf.WriteByte(0)
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -203,7 +203,7 @@ func TestUintDecode(t *testing.T) {
 		buf.WriteByte(0b0111_1111)
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 1, n)
@@ -221,7 +221,7 @@ func TestUintDecode(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 3, n)
@@ -245,7 +245,7 @@ func TestUintDecode(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 9, n)
@@ -270,7 +270,7 @@ func TestUintDecode(t *testing.T) {
 		})
 
 		dec := NewDecoder(&buf)
-		value, n, err := vtUint.Decode(dec)
+		value, n, err := vtUint.Decode(dec, false)
 		assert.NoError(t, err)
 
 		assert.Equal(t, 10, n)

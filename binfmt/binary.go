@@ -39,12 +39,12 @@ func (Binary) Encode(enc *Encoder, value []byte) error {
 }
 
 // Decode decodes arbitrary bytes from the decoders reader. First by reading the
-// length using Int, followed by reading the actual bytes. The returned byte
-// slice is only valid until the next call made to the [Decoder].
-func (Binary) Decode(dec *Decoder) ([]byte, int, error) {
+// length using Int, followed by reading the actual bytes. If createCopy is false
+// the returned byte slice is only valid until the next call made to the [Decoder].
+func (Binary) Decode(dec *Decoder, createCopy bool) ([]byte, int, error) {
 	var vtInt Int
 
-	length, lenn, err := vtInt.Decode(dec)
+	length, lenn, err := vtInt.Decode(dec, false)
 	if err != nil {
 		return nil, lenn, fmt.Errorf("binfmt: failed to decode binary length: %w", err)
 	}
@@ -73,5 +73,11 @@ func (Binary) Decode(dec *Decoder) ([]byte, int, error) {
 		}
 	}
 
-	return bytes, lenn + n, nil
+	value := bytes
+	if createCopy {
+		value = make([]byte, len(bytes))
+		copy(value, bytes)
+	}
+
+	return value, lenn + n, nil
 }

@@ -43,14 +43,14 @@ func (dec *Decoder) Row() (byte, string, RowValueDecoder, int, error) {
 
 	switch ident {
 	case SetRowIdent:
-		key, keyn, err := vtString.Decode(dec)
+		key, keyn, err := vtString.Decode(dec, false)
 		if err != nil {
 			return 0, "", rvd, 1 + keyn, fmt.Errorf("binfmt: failed to decode key: %w", err)
 		}
 
 		return ident, key, RowValueDecoder{HasValue: true, dec: dec}, 1 + keyn, nil
 	case DeleteRowIdent:
-		key, keyn, err := vtString.Decode(dec)
+		key, keyn, err := vtString.Decode(dec, false)
 		if err != nil {
 			return 0, "", rvd, 1 + keyn, fmt.Errorf("binfmt: failed to decode key: %w", err)
 		}

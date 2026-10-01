@@ -54,10 +54,10 @@ func (String) Encode(enc *Encoder, value string) error {
 // using [Int.Decode], followed by reading the bytes for the string.
 //
 // [ErrStringInvalid] is returned when the decoded bytes are not valid UTF-8.
-func (String) Decode(dec *Decoder) (string, int, error) {
+func (String) Decode(dec *Decoder, _ bool) (string, int, error) {
 	var vtInt Int
 
-	length, lenn, err := vtInt.Decode(dec)
+	length, lenn, err := vtInt.Decode(dec, false)
 	if err != nil {
 		return "", lenn, fmt.Errorf("binfmt: failed to decode string length: %w", err)
 	}

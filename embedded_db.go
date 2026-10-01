@@ -184,13 +184,15 @@ func (edb *EmbeddedDB) Delete(key string) error {
 //
 // [ErrNotFound] is returned if the key was not found.
 // [ErrClosed] is returned if the database has been closed.
-func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
+func (edb *EmbeddedDB) Get[VT ValueType[T], T any](key string) (T, error) {
+	var zeroT T
+
 	if edb.closed.Load() {
-		return nil, ErrClosed
+		return zeroT, ErrClosed
 	}
 
 	if key == "" {
-		return nil, ErrEmptyKey
+		return zeroT, ErrEmptyKey
 	}
 
 	idx := int(edb.readerCounter.Add(1)) % len(edb.readers)
@@ -207,12 +209,12 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 
 	_, err := file.Seek(offset, io.SeekStart)
 	if err != nil {
-		return nil, fmt.Errorf("kvega: failed to seek reader: %w", err)
+		return zeroT, fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
 	var (
 		found bool
-		value []byte
+		value T
 	)
 
 	decoder := binfmt.NewDecoder(file)
@@ -224,28 +226,25 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 		}
 
 		if err != nil {
-			return nil, err
+			return zeroT, err
 		}
 
 		if rowKey == key {
 			if rowValueDecoder.HasValue {
-				tmpValue, _, err := rowValueDecoder.Get[binfmt.Binary]()
+				rowValue, _, err := rowValueDecoder.Get[VT]()
 				if err != nil {
-					return nil, fmt.Errorf("kvega: failed to decode value: %w", err)
+					return zeroT, fmt.Errorf("kvega: failed to decode value: %w", err)
 				}
 
-				// Copy of value since it's only valid for this decodeRow loop.
-				value = make([]byte, len(tmpValue))
-				copy(value, tmpValue)
-
 				found = true
+				value = rowValue
 			} else {
 				found = false // If decode has no value then it's a delete row.
 			}
 		} else if rowValueDecoder.HasValue {
 			_, err := rowValueDecoder.Skip()
 			if err != nil {
-				return nil, fmt.Errorf("kvega: failed to decode value: %w", err)
+				return zeroT, fmt.Errorf("kvega: failed to decode value: %w", err)
 			}
 		}
 
@@ -256,7 +255,7 @@ func (edb *EmbeddedDB) Get(key string) ([]byte, error) {
 	}
 
 	if !found {
-		return nil, ErrNotFound
+		return zeroT, ErrNotFound
 	}
 
 	return value, nil

@@ -85,7 +85,7 @@ func (Uint) Encode(enc *Encoder, value uint64) error {
 //
 // [ErrDecodeUintInvalid] is returned if the end of the encoded uint is not encountered within 10 bytes.
 // [ErrDecodeUintOverflow] is returned if the decoded value would exceed uint64.
-func (Uint) Decode(dec *Decoder) (uint64, int, error) {
+func (Uint) Decode(dec *Decoder, _ bool) (uint64, int, error) {
 	var n int
 
 	maxBytes := 10
