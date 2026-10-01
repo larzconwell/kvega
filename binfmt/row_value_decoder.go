@@ -28,9 +28,11 @@ type RowValueDecoder struct {
 	dec      *Decoder
 }
 
-// Get decodes a value from the decoders reader using the provided
-// [ValueType] parameter. [ErrRowValueIdentInvalid] is returned if
-// the value type identifier is not valid for the provided [ValueType].
+// Get decodes a value from the decoders reader using the provided [ValueType] parameter.
+//
+// [ValueTypeMismatchError] is returned if the value type identifier s not valid for
+// the provided [ValueType] and the value type identifier is then unread to enable
+// the caller to inspect, retry, etc.
 func (rvd RowValueDecoder) Get[VT ValueType[T], T any]() (T, int, error) {
 	var (
 		vt    VT
@@ -47,6 +49,11 @@ func (rvd RowValueDecoder) Get[VT ValueType[T], T any]() (T, int, error) {
 	}
 
 	if ident != vt.Ident() {
+		// This error is less important than returning the primary error.
+		//nolint:errcheck
+		//gosec:disable G104
+		rvd.dec.reader.UnreadByte()
+
 		return value, 1, ValueTypeMismatchError{
 			Expected: vt.Ident(),
 			Found:    ident,
@@ -62,9 +69,10 @@ func (rvd RowValueDecoder) Get[VT ValueType[T], T any]() (T, int, error) {
 }
 
 // Skip decodes a value from the decoders reader and discards it.
-// If an error occurs decoding the rows value the error is returned,
-// and if the value type identifier is not valid then
-// [ErrRowValueIdentInvalid] is returned.
+//
+// [ErrRowValueIdentInvalid] is returned if the value type identifier is
+// not valid, the read type value identifier is then unread to enable the
+// caller to inspect, retry, etc.
 func (rvd RowValueDecoder) Skip() (int, error) {
 	ident, err := rvd.dec.reader.ReadByte()
 	if errors.Is(err, io.EOF) {
@@ -93,6 +101,11 @@ func (rvd RowValueDecoder) Skip() (int, error) {
 	case vtString.Ident():
 		_, n, err = vtString.Decode(rvd.dec, false)
 	default:
+		// This error is less important than returning the primary error.
+		//nolint:errcheck
+		//gosec:disable G104
+		rvd.dec.reader.UnreadByte()
+
 		return 1, ErrRowValueIdentInvalid
 	}
 

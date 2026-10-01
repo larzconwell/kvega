@@ -15,7 +15,7 @@ func TestBinaryIdent(t *testing.T) {
 	assert.Equal(t, byte('B'), vtBinary.Ident())
 }
 
-func TestEncoderBinary(t *testing.T) {
+func TestBinaryEncode(t *testing.T) {
 	t.Parallel()
 
 	var vtBinary Binary
@@ -66,7 +66,7 @@ func TestEncoderBinary(t *testing.T) {
 	})
 }
 
-func TestDecoderBinary(t *testing.T) {
+func TestBinaryDecode(t *testing.T) {
 	t.Parallel()
 
 	var (

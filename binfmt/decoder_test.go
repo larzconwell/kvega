@@ -40,7 +40,7 @@ func TestDecoderRow(t *testing.T) {
 		assert.ErrorContains(t, err, "decode row identifier")
 	})
 
-	t.Run("returns ErrRowIdentInvalid if decoded row identifier is invalid", func(t *testing.T) {
+	t.Run("returns ErrRowIdentInvalid if decoded row identifier is invalid and unreads the row identifier", func(t *testing.T) {
 		t.Parallel()
 
 		buf := bytes.NewBuffer([]byte{'Z'})
@@ -52,6 +52,11 @@ func TestDecoderRow(t *testing.T) {
 		assert.Zero(t, valueDecoder)
 		assert.Equal(t, 1, n)
 		assert.ErrorIs(t, err, ErrRowIdentInvalid)
+
+		ident, err = dec.reader.ReadByte()
+		assert.NoError(t, err)
+
+		assert.Equal(t, byte('Z'), ident)
 	})
 
 	t.Run("returns error from decoding set row key", func(t *testing.T) {

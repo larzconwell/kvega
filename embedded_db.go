@@ -212,12 +212,13 @@ func (edb *EmbeddedDB) Get[VT ValueType[T], T any](key string) (T, error) {
 		return zeroT, fmt.Errorf("kvega: failed to seek reader: %w", err)
 	}
 
-	var (
-		found bool
-		value T
-	)
-
 	decoder := binfmt.NewDecoder(file)
+
+	var (
+		found    bool
+		rowErr   error
+		rowValue T
+	)
 
 	for {
 		_, rowKey, rowValueDecoder, _, err := edb.decodeRow(decoder)
@@ -230,16 +231,22 @@ func (edb *EmbeddedDB) Get[VT ValueType[T], T any](key string) (T, error) {
 		}
 
 		if rowKey == key {
+			// Delete rows do not have a value to decode.
+			found = rowValueDecoder.HasValue
+			rowErr = nil
+
 			if rowValueDecoder.HasValue {
-				rowValue, _, err := rowValueDecoder.Get[VT]()
-				if err != nil {
+				rowValue, _, err = rowValueDecoder.Get[VT]()
+				if errors.As(err, new(binfmt.ValueTypeMismatchError)) {
+					rowErr = err
+
+					_, err = rowValueDecoder.Skip()
+					if err != nil {
+						return zeroT, fmt.Errorf("kvega: failed to decode value: %w", err)
+					}
+				} else if err != nil {
 					return zeroT, fmt.Errorf("kvega: failed to decode value: %w", err)
 				}
-
-				found = true
-				value = rowValue
-			} else {
-				found = false // If decode has no value then it's a delete row.
 			}
 		} else if rowValueDecoder.HasValue {
 			_, err := rowValueDecoder.Skip()
@@ -248,17 +255,21 @@ func (edb *EmbeddedDB) Get[VT ValueType[T], T any](key string) (T, error) {
 			}
 		}
 
-		// Only decode a single row if we found offset in index.
+		// Only decode a single row if we found an offset in the index.
 		if foundOffset {
 			break
 		}
+	}
+
+	if rowErr != nil {
+		return zeroT, fmt.Errorf("kvega: failed to decode value: %w", rowErr)
 	}
 
 	if !found {
 		return zeroT, ErrNotFound
 	}
 
-	return value, nil
+	return rowValue, nil
 }
 
 // encodeRow encodes row data by filling a buffer using the given

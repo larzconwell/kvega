@@ -28,8 +28,11 @@ func NewDecoder(reader io.Reader) *Decoder {
 
 // Row decodes a row identifier and key from the decodes reader and returns it
 // along with a row value decoder if the row has a value associated with it.
-// If the row identifier is invalid, [ErrRowIdentInvalid] is returned. [io.EOF]
-// is returned if the end of the decoders reader has been reached.
+//
+// [io.EOF] is returned if the end of the decoders reader has been reached.
+//
+// [ErrRowIdentInvalid] is returned if the row identifier is invalid, the read
+// row identifier is then unread to enable the caller to inspect, retry, etc.
 func (dec *Decoder) Row() (byte, string, RowValueDecoder, int, error) {
 	var (
 		vtString String
@@ -57,6 +60,11 @@ func (dec *Decoder) Row() (byte, string, RowValueDecoder, int, error) {
 
 		return ident, key, RowValueDecoder{}, 1 + keyn, nil
 	default:
+		// This error is less important than returning the primary error.
+		//nolint:errcheck
+		//gosec:disable G104
+		dec.reader.UnreadByte()
+
 		return 0, "", rvd, 1, ErrRowIdentInvalid
 	}
 }

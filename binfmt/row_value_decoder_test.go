@@ -28,7 +28,7 @@ func TestRowValueDecoderGet(t *testing.T) {
 		assert.ErrorContains(t, err, "decode value type identifier")
 	})
 
-	t.Run("return ValueTypeMismatchError if decoded an unexpected value type identifier", func(t *testing.T) {
+	t.Run("return ValueTypeMismatchError if decoded an unexpected value type identifier and unreads the value type identifier", func(t *testing.T) {
 		t.Parallel()
 
 		var vtBinary Binary
@@ -50,6 +50,11 @@ func TestRowValueDecoderGet(t *testing.T) {
 		assert.ErrorAs(t, err, &vtmerr)
 		assert.Equal(t, vtBinary.Ident(), vtmerr.Expected)
 		assert.Equal(t, byte('I'), vtmerr.Found)
+
+		ident, err := rvd.dec.reader.ReadByte()
+		assert.NoError(t, err)
+
+		assert.Equal(t, byte('I'), ident)
 	})
 
 	t.Run("return error from Binary for binary value type identifier", func(t *testing.T) {
@@ -205,7 +210,7 @@ func TestRowValueDecoderSkip(t *testing.T) {
 		assert.ErrorContains(t, err, "decode value type identifier")
 	})
 
-	t.Run("return ErrRowValueIdentInvalid if decoded an invalid value type identifier", func(t *testing.T) {
+	t.Run("return ErrRowValueIdentInvalid if decoded an invalid value type identifier and unreads the value type identifier", func(t *testing.T) {
 		t.Parallel()
 
 		// Force error by writing invalid value type identifier.
@@ -220,6 +225,11 @@ func TestRowValueDecoderSkip(t *testing.T) {
 
 		assert.Equal(t, 1, n)
 		assert.ErrorIs(t, err, ErrRowValueIdentInvalid)
+
+		ident, err := rvd.dec.reader.ReadByte()
+		assert.NoError(t, err)
+
+		assert.Equal(t, byte('Z'), ident)
 	})
 
 	t.Run("returns error from decoding value types", func(t *testing.T) {

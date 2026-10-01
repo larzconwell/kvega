@@ -938,11 +938,11 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
-			assert.NoError(t, edb.Set[Binary]("key", []byte("abc")))
-			assert.NoError(t, edb.Set[Binary]("key2", []byte("def")))
+			assert.NoError(t, edb.Set[Int]("key", 1))
+			assert.NoError(t, edb.Set[Binary]("key2", []byte("abc")))
 			assert.NoError(t, edb.Delete("key"))
-			assert.NoError(t, edb.Set[Binary]("key", []byte("ghi")))
-			assert.NoError(t, edb.Set[Binary]("key2", []byte("jkl")))
+			assert.NoError(t, edb.Set[Binary]("key", []byte("def")))
+			assert.NoError(t, edb.Set[Int]("key2", 2))
 
 			// Empty out index to force unindexed path.
 			assert.NotEmpty(t, edb.index)
@@ -950,7 +950,7 @@ func TestEmbeddedDBGet(t *testing.T) {
 
 			value, err := edb.Get[Binary]("key")
 			assert.NoError(t, err)
-			assert.Equal(t, "ghi", string(value))
+			assert.Equal(t, "def", string(value))
 		})
 
 		t.Run("returns the result of the last row found for the key assuming the last row was a delete", func(t *testing.T) {
@@ -965,12 +965,12 @@ func TestEmbeddedDBGet(t *testing.T) {
 				assert.NoError(t, edb.Close())
 			}()
 
-			assert.NoError(t, edb.Set[Binary]("key", []byte("abc")))
-			assert.NoError(t, edb.Set[Binary]("key2", []byte("def")))
+			assert.NoError(t, edb.Set[Int]("key", 1))
+			assert.NoError(t, edb.Set[Binary]("key2", []byte("abc")))
 			assert.NoError(t, edb.Delete("key2"))
-			assert.NoError(t, edb.Set[Binary]("key", []byte("ghi")))
+			assert.NoError(t, edb.Set[Binary]("key", []byte("def")))
 			assert.NoError(t, edb.Delete("key"))
-			assert.NoError(t, edb.Set[Binary]("key2", []byte("jkl")))
+			assert.NoError(t, edb.Set[Int]("key2", 2))
 
 			// Empty out index to force unindexed path.
 			assert.NotEmpty(t, edb.index)
