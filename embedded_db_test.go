@@ -4,6 +4,7 @@ import (
 	crypto "crypto/rand"
 	"errors"
 	"io"
+	"math"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -200,15 +201,61 @@ func BenchmarkEmbeddedDBBuildIndex(b *testing.B) {
 	}
 }
 
-func FuzzEmbeddedDB(f *testing.F) {
-	f.Add("key", []byte("value"))
+func FuzzEmbeddedDBUint(f *testing.F) {
+	f.Add("key", uint64(0))
 
-	f.Fuzz(func(t *testing.T, key string, value []byte) {
-		if key == "" {
+	f.Fuzz(func(t *testing.T, key string, value uint64) {
+		if key == "" || !utf8.ValidString(key) {
 			return
 		}
 
-		if !utf8.ValidString(key) {
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Set[Uint](key, value))
+
+		retrievedValue, err := edb.Get[Uint](key)
+		assert.NoError(t, err)
+		assert.Equal(t, value, retrievedValue)
+	})
+}
+
+func FuzzEmbeddedDBInt(f *testing.F) {
+	f.Add("key", int64(math.MinInt64))
+
+	f.Fuzz(func(t *testing.T, key string, value int64) {
+		if key == "" || !utf8.ValidString(key) {
+			return
+		}
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Set[Int](key, value))
+
+		retrievedValue, err := edb.Get[Int](key)
+		assert.NoError(t, err)
+		assert.Equal(t, value, retrievedValue)
+	})
+}
+
+func FuzzEmbeddedDBBinary(f *testing.F) {
+	f.Add("key", []byte("value"))
+
+	f.Fuzz(func(t *testing.T, key string, value []byte) {
+		if key == "" || !utf8.ValidString(key) {
 			return
 		}
 
@@ -224,6 +271,35 @@ func FuzzEmbeddedDB(f *testing.F) {
 		assert.NoError(t, edb.Set[Binary](key, value))
 
 		retrievedValue, err := edb.Get[Binary](key)
+		assert.NoError(t, err)
+		assert.Equal(t, value, retrievedValue)
+	})
+}
+
+func FuzzEmbeddedDBString(f *testing.F) {
+	f.Add("key", "value")
+
+	f.Fuzz(func(t *testing.T, key, value string) {
+		if key == "" || !utf8.ValidString(key) {
+			return
+		}
+
+		if !utf8.ValidString(value) {
+			return
+		}
+
+		path := filepath.Join(t.ArtifactDir(), "db.kvega")
+
+		edb, err := OpenEmbeddedDB(path)
+		assert.NoError(t, err)
+
+		defer func() {
+			assert.NoError(t, edb.Close())
+		}()
+
+		assert.NoError(t, edb.Set[String](key, value))
+
+		retrievedValue, err := edb.Get[String](key)
 		assert.NoError(t, err)
 		assert.Equal(t, value, retrievedValue)
 	})
